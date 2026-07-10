@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sem conexão · Daniel Lanches</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #1a1a1a;
+        color: #ffffff;
+        text-align: center;
+        padding: 24px;
+      }
+      .badge {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: #ffc107;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #1a1a1a;
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+      h1 { font-size: 20px; margin: 0; }
+      p { color: rgba(255,255,255,.65); max-width: 320px; margin: 0; }
+      button {
+        margin-top: 12px;
+        padding: 12px 22px;
+        border: 0;
+        border-radius: 12px;
+        background: #ffc107;
+        color: #1a1a1a;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="badge">DL</div>
+    <h1>Você está offline</h1>
+    <p>Não foi possível carregar o Daniel Lanches OS. Verifique sua conexão e tente novamente.</p>
+    <button onclick="location.reload()">Tentar novamente</button>
+  </body>
+</html>
