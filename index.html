@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daniel Lanches OS</title>
+    <meta name="theme-color" content="#1A1A1A" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="daniel-lanches-icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="daniel-lanches-icon-512.png" />
+    <link rel="apple-touch-icon" href="daniel-lanches-icon-192.png" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script defer src="script.js"></script>
+    <script defer src="public-app.js"></script>
+  </head>
+  <body>
+    <div id="publicAppRoot"></div>
+    <div id="adminAppRoot">
+      <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <img class="brand-logo" src="daniel-lanches-logo.jpg" alt="Logo Daniel Lanches" />
+          <div>
+            <strong>Daniel Lanches</strong>
+            <span>Merchant OS</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Navegação principal">
+          <button class="nav-item" data-view="auth" data-public-route="/admin/login"><i data-lucide="lock-keyhole"></i><span>Acesso</span></button>
+          <button class="nav-item active" data-view="dashboard" data-public-route="/admin/dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
+          <button class="nav-item" data-view="orders" data-public-route="/admin/pedidos"><i data-lucide="kanban-square"></i><span>Pedidos</span></button>
+          <button class="nav-item" data-view="menu" data-public-route="/admin/cardapio"><i data-lucide="utensils"></i><span>Cardápio</span></button>
+          <button class="nav-item" data-view="settings" data-public-route="/admin/configuracoes"><i data-lucide="settings"></i><span>Configurações</span></button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span>Plano Business</span>
+          <strong>R$ 189/mês</strong>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <button class="icon-btn" id="sidebarToggle" aria-label="Recolher menu"><i data-lucide="panel-left-close"></i></button>
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="search" placeholder="Buscar pedido, produto ou cliente" />
+          </div>
+          <button class="ghost-btn" id="publicMenuBtn"><i data-lucide="store"></i><span>Ver cardápio público</span></button>
+          <button class="ghost-btn" id="shareStoreBtn"><i data-lucide="qr-code"></i><span>Link da loja</span></button>
+          <button class="ghost-btn" id="storeToggleBtn"><i data-lucide="power"></i><span>Loja aberta</span></button>
+          <button class="secondary-btn" id="newOrderBtn"><i data-lucide="bell-plus"></i><span>Simular pedido</span></button>
+          <button class="primary-btn"><i data-lucide="plus"></i><span>Novo produto</span></button>
+          <div class="profile-pill">
+            <span class="status-dot"></span>
+            <div>
+              <strong>Ana Admin</strong>
+              <small>Administrador</small>
+            </div>
+          </div>
+        </header>
+
+        <section class="notice-row">
+          <div class="live-badge"><span></span> Atualização em tempo real</div>
+          <p id="storeNotice">Loja aberta, entrega estimada em 35-45 min, pedido mínimo R$ 25,00.</p>
+        </section>
+
+        <section class="view" id="auth">
+          <div class="page-heading">
+            <div><span class="eyebrow">Supabase Auth ready</span><h1>Gestão de acesso e permissões</h1></div>
+            <span class="session-pill"><i data-lucide="shield-check"></i> Sessão ativa por 8h</span>
+          </div>
+          <div class="content-grid two-col">
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Login</span><h2>Entrar no painel</h2></div></div>
+              <form class="auth-form">
+                <label>E-mail<input id="adminEmail" type="email" placeholder="admin@example.com" /></label>
+                <label>Senha<input id="adminPassword" type="password" placeholder="••••••••" /></label>
+<button class="primary-btn full" type="button" id="adminLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button>
+              </form>
+              <div class="auth-tabs">
+                <button>Cadastro</button>
+                <button>Recuperar senha</button>
+                <button>2FA futuro</button>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Perfis</span><h2>Controle de permissões</h2></div></div>
+              <div class="permission-grid">
+                <div><strong>Super Administrador</strong><span>Empresas, planos, logs, pagamentos e suporte.</span></div>
+                <div><strong>Administrador</strong><span>Operação completa da loja e configurações.</span></div>
+                <div><strong>Funcionário</strong><span>Pedidos, cardápio e atendimento.</span></div>
+                <div><strong>Entregador</strong><span>Somente fila de saída e status de entrega simples.</span></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view active" id="dashboard">
+          <div class="page-heading">
+            <div>
+              <span class="eyebrow">Operação de hoje</span>
+              <h1>Dashboard executivo</h1>
+            </div>
+            <div class="segmented" role="tablist">
+              <button class="selected">Hoje</button>
+              <button>7 dias</button>
+              <button>Mês</button>
+            </div>
+          </div>
+
+          <div class="metrics-grid">
+            <article class="metric-card"><span>Pedidos Hoje</span><strong id="metricOrders">48</strong><small id="metricOrdersHint">+18% vs. ontem</small></article>
+            <article class="metric-card"><span>Vendas Hoje</span><strong id="metricSales">R$ 3.842</strong><small id="metricItemsSold">87 itens vendidos</small></article>
+            <article class="metric-card"><span>Receita Mensal</span><strong>R$ 74.910</strong><small>Meta em 82%</small></article>
+            <article class="metric-card"><span>Ticket Médio</span><strong id="metricAverage">R$ 79,90</strong><small>Atualizado ao vivo</small></article>
+            <article class="metric-card"><span>Total de Clientes</span><strong id="metricCustomers">16</strong><small>Inclui clientes logados</small></article>
+            <article class="metric-card"><span>Pendentes</span><strong id="metricPending">7</strong><small>Novos e em preparo</small></article>
+          </div>
+
+          <section class="panel quick-store-panel">
+            <div>
+              <span class="eyebrow">Canal de venda</span>
+              <h2>Cardápio público pronto para compartilhar</h2>
+              <p>Link curto, QR Code de mesa, pedido automático, confirmação por WhatsApp e status simples para o cliente.</p>
+            </div>
+            <div class="store-share">
+              <div class="qr-card" aria-label="QR Code ilustrativo"><i data-lucide="qr-code"></i></div>
+              <div>
+                <strong>daniel.app/pedir</strong>
+                <span>PIX, dinheiro, cartão e Mercado Pago</span>
+              </div>
+              <button class="primary-btn" data-public-route="/cardapio"><i data-lucide="external-link"></i><span>Abrir loja</span></button>
+            </div>
+          </section>
+
+          <div class="content-grid two-col">
+            <section class="panel wide">
+              <div class="panel-head">
+                <div><span class="eyebrow">Vendas últimos 7 dias</span><h2>Receita por período</h2></div>
+                <button class="icon-btn" aria-label="Exportar"><i data-lucide="download"></i></button>
+              </div>
+              <div class="bar-chart" aria-label="Gráfico de vendas dos últimos 7 dias">
+                <span style="--h:42%" data-sales-bar><b>Seg</b></span>
+                <span style="--h:58%" data-sales-bar><b>Ter</b></span>
+                <span style="--h:51%" data-sales-bar><b>Qua</b></span>
+                <span style="--h:76%" data-sales-bar><b>Qui</b></span>
+                <span style="--h:70%" data-sales-bar><b>Sex</b></span>
+                <span style="--h:94%" data-sales-bar><b>Sáb</b></span>
+                <span style="--h:82%" data-sales-bar><b>Dom</b></span>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div><span class="eyebrow">Pedidos por status</span><h2>Fila viva</h2></div>
+              </div>
+              <div class="status-list">
+                <div><span>Novo</span><meter min="0" max="100" value="28" data-status-meter="Novo"></meter><strong data-status-count="Novo">8</strong></div>
+                <div><span>Preparo</span><meter min="0" max="100" value="54" data-status-meter="Em preparo"></meter><strong data-status-count="Em preparo">13</strong></div>
+                <div><span>Entrega</span><meter min="0" max="100" value="36" data-status-meter="Saiu para entrega"></meter><strong data-status-count="Saiu para entrega">9</strong></div>
+                <div><span>Entregue</span><meter min="0" max="100" value="82" data-status-meter="Entregue"></meter><strong data-status-count="Entregue">41</strong></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="content-grid three-col">
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Produtos</span><h2>Mais vendidos</h2></div></div>
+              <ol class="rank-list" id="topProductsList">
+                <li><span>X Bacon Supremo</span><strong>142</strong></li>
+                <li><span>Combo Duplo Daniel</span><strong>118</strong></li>
+                <li><span>Batata cheddar</span><strong>91</strong></li>
+                <li><span>X Salada Artesanal</span><strong>74</strong></li>
+              </ol>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Picos</span><h2>Horários críticos</h2></div></div>
+              <div class="heat-row"><span>18h</span><b></b><b></b><b></b><b class="hot"></b><b class="hot"></b></div>
+              <div class="heat-row"><span>19h</span><b></b><b class="hot"></b><b class="hot"></b><b class="hot"></b><b></b></div>
+              <div class="heat-row"><span>20h</span><b></b><b></b><b class="hot"></b><b></b><b></b></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Categorias</span><h2>Mix de venda</h2></div></div>
+              <div class="donut-wrap">
+                <div class="donut"></div>
+                <ul>
+                  <li><span class="dot yellow"></span> Hambúrgueres 52%</li>
+                  <li><span class="dot black"></span> Combos 26%</li>
+                  <li><span class="dot green"></span> Bebidas 14%</li>
+                  <li><span class="dot red"></span> Extras 8%</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-head"><div><span class="eyebrow">Tempo real</span><h2>Últimos pedidos</h2></div></div>
+            <div class="latest-orders" id="latestOrders"></div>
+          </section>
+        </section>
+
+        <section class="view" id="orders">
+          <div class="page-heading">
+            <div><span class="eyebrow">Gestão operacional</span><h1>Pedidos em Kanban</h1></div>
+            <div class="toolbar"><button class="secondary-btn" id="printLastBtn"><i data-lucide="printer"></i><span>Imprimir último</span></button><button class="primary-btn"><i data-lucide="receipt-text"></i><span>Emitir cupom</span></button></div>
+          </div>
+          <div class="kanban" id="kanban"></div>
+        </section>
+
+        <section class="view" id="menu">
+          <div class="page-heading">
+            <div><span class="eyebrow">Cadastro completo</span><h1>Cardápio, categorias e adicionais</h1></div>
+            <button class="primary-btn" id="duplicateProductBtn" type="button"><i data-lucide="copy-plus"></i><span>Duplicar produto</span></button>
+          </div>
+          <div class="content-grid two-col">
+            <form class="panel product-form" id="productForm">
+              <div class="panel-head"><div><span class="eyebrow">Produto</span><h2 id="productFormTitle">X Bacon Supremo</h2></div><label class="switch"><input id="productAvailableSwitch" type="checkbox" checked /><span></span></label></div>
+              <div class="form-grid">
+                <label>Nome<input id="productName" value="X Bacon Supremo" /></label>
+                <label>Categoria<select id="productCategory"><option>Destaque</option><option>Hambúrguer</option><option>Combo</option><option>Bebida</option><option>Extra</option></select></label>
+                <label>Preço<input id="productPrice" value="39,90" /></label>
+                <label>Promoção<input id="productOldPrice" value="46,90" /></label>
+                <label>Estoque<input id="productStock" value="42" /></label>
+                <label>Tempo preparo<input id="productPrepTime" value="18 min" /></label>
+              </div>
+              <label>Descrição<textarea id="productDescription">Blend 160g, bacon crocante, queijo cheddar, molho Daniel e pão brioche selado.</textarea></label>
+              <label>Ingredientes<input id="productIngredients" value="blend, bacon, cheddar, alface, tomate, molho Daniel" /></label>
+              <div class="check-row"><label><input id="productFeatured" type="checkbox" checked /> Destaque</label><label><input id="productAvailable" type="checkbox" checked /> Disponível</label><label><input id="productUnavailable" type="checkbox" /> Indisponível</label></div>
+              <button class="primary-btn full" id="saveProductBtn" type="submit"><i data-lucide="save"></i><span>Salvar produto</span></button>
+              <div class="admin-product-list" id="productAdminList"></div>
+            </form>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Drag and drop</span><h2>Categorias</h2></div></div>
+              <div class="category-list">
+                <div draggable="true"><i data-lucide="grip-vertical"></i><span>Hambúrgueres</span><strong>18</strong></div>
+                <div draggable="true"><i data-lucide="grip-vertical"></i><span>Combos</span><strong>9</strong></div>
+                <div draggable="true"><i data-lucide="grip-vertical"></i><span>Bebidas</span><strong>22</strong></div>
+                <div draggable="true"><i data-lucide="grip-vertical"></i><span>Extras</span><strong>14</strong></div>
+              </div>
+              <div class="addon-groups">
+                <h3>Grupos de adicionais</h3>
+                <span>Molhos · Obrigatório · 1 a 2 · +R$ 2,00</span>
+                <span>Bebidas · Opcional · 0 a 3 · +R$ 7,00</span>
+                <span>Queijos · Opcional · 0 a 2 · +R$ 4,50</span>
+                <span>Carnes · Opcional · 0 a 2 · +R$ 9,00</span>
+              </div>
+              <div class="addon-groups">
+                <h3>Combos</h3>
+                <span>Combo Duplo Daniel · 2 burgers + batata + bebida · R$ 68,90</span>
+                <span>Família Premium · 4 burgers + 2 batatas + 2 bebidas · R$ 139,90</span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="customers">
+          <div class="page-heading"><div><span class="eyebrow">CRM automático</span><h1>Clientes</h1></div></div>
+          <div class="table-panel">
+            <table>
+              <thead><tr><th>Cliente</th><th>Último pedido</th><th>Pedidos</th><th>Total gasto</th><th>Endereços</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td>Mariana Souza</td><td>Hoje, 19:42</td><td>18</td><td>R$ 1.438</td><td>2</td><td>Sem cebola</td></tr>
+                <tr><td>Rafael Lima</td><td>Ontem, 21:10</td><td>11</td><td>R$ 896</td><td>1</td><td>Troco para 100</td></tr>
+                <tr><td>Casa 24 Coworking</td><td>Segunda, 12:20</td><td>32</td><td>R$ 4.920</td><td>3</td><td>Pedido corporativo</td></tr>
+                <tr><td>Bianca Alves</td><td>Domingo, 20:03</td><td>6</td><td>R$ 412</td><td>1</td><td>Prefere retirada</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="delivery">
+          <div class="page-heading"><div><span class="eyebrow">Entrega simples</span><h1>MVP sem logística avançada</h1></div></div>
+          <div class="content-grid three-col">
+            <section class="panel settings-card"><i data-lucide="badge-dollar-sign"></i><span>Taxa fixa</span><strong id="deliveryFeeCard">R$ 7,90</strong></section>
+            <section class="panel settings-card"><i data-lucide="shopping-bag"></i><span>Pedido mínimo</span><strong id="minimumOrderCard">R$ 25,00</strong></section>
+            <section class="panel settings-card"><i data-lucide="timer"></i><span>Tempo estimado</span><strong>35-45 min</strong></section>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div><span class="eyebrow">Modalidades</span><h2>Retirada e entrega</h2></div></div>
+            <div class="toggle-list">
+              <label><input type="checkbox" checked /> Retirada no local</label>
+              <label><input type="checkbox" checked /> Entrega no endereço</label>
+              <label><input type="checkbox" checked /> Status do pedido para cliente</label>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="coupons">
+          <div class="page-heading">
+            <div><span class="eyebrow">Campanhas</span><h1>Cupons</h1></div>
+            <button class="primary-btn"><i data-lucide="ticket-plus"></i><span>Novo cupom</span></button>
+          </div>
+          <div class="content-grid three-col">
+            <section class="panel coupon-card"><span>Percentual</span><strong>DANIEL10</strong><p>10% de desconto válido até 31/07/2026, pedido mínimo R$ 40,00.</p></section>
+            <section class="panel coupon-card"><span>Valor fixo</span><strong>VOLTEI15</strong><p>R$ 15,00 para clientes recorrentes, limite de 200 usos.</p></section>
+            <section class="panel coupon-card"><span>Frete grátis</span><strong>ENTREGAZERO</strong><p>Frete grátis em hambúrgueres e combos selecionados.</p></section>
+          </div>
+          <div class="table-panel">
+            <table>
+              <thead><tr><th>Cupom</th><th>Tipo</th><th>Validade</th><th>Quantidade</th><th>Pedido mínimo</th><th>Aplicação</th></tr></thead>
+              <tbody>
+                <tr><td>DANIEL10</td><td>Percentual</td><td>31/07/2026</td><td>500</td><td>R$ 40,00</td><td>Categorias</td></tr>
+                <tr><td>VOLTEI15</td><td>Valor fixo</td><td>15/08/2026</td><td>200</td><td>R$ 60,00</td><td>Clientes</td></tr>
+                <tr><td>ENTREGAZERO</td><td>Frete grátis</td><td>Domingos</td><td>100</td><td>R$ 80,00</td><td>Produtos</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="finance">
+          <div class="page-heading">
+            <div><span class="eyebrow">Relatórios e caixa</span><h1>Financeiro</h1></div>
+            <div class="toolbar"><button class="secondary-btn"><i data-lucide="file-spreadsheet"></i><span>Excel</span></button><button class="secondary-btn"><i data-lucide="file-text"></i><span>PDF</span></button><button class="secondary-btn"><i data-lucide="database"></i><span>CSV</span></button></div>
+          </div>
+          <div class="metrics-grid">
+            <article class="metric-card"><span>Entradas</span><strong>R$ 28.940</strong><small>Semana atual</small></article>
+            <article class="metric-card"><span>Saídas</span><strong>R$ 9.820</strong><small>Insumos e taxas</small></article>
+            <article class="metric-card"><span>Lucro</span><strong>R$ 19.120</strong><small>Margem 66%</small></article>
+            <article class="metric-card"><span>Comissões</span><strong>R$ 1.430</strong><small>Gateways</small></article>
+          </div>
+          <section class="panel wide">
+            <div class="panel-head"><div><span class="eyebrow">Fluxo de caixa</span><h2>Receita mensal</h2></div></div>
+            <div class="line-chart"><svg viewBox="0 0 800 240" role="img" aria-label="Linha de fluxo de caixa"><polyline points="0,190 90,160 180,170 270,110 360,130 450,80 540,96 630,42 720,70 800,36" /><path d="M0 190 L90 160 L180 170 L270 110 L360 130 L450 80 L540 96 L630 42 L720 70 L800 36 L800 240 L0 240 Z" /></svg></div>
+          </section>
+        </section>
+
+        <section class="view" id="reports">
+          <div class="page-heading">
+            <div><span class="eyebrow">Exportações</span><h1>Relatórios</h1></div>
+            <div class="toolbar"><button class="secondary-btn"><i data-lucide="file-spreadsheet"></i><span>Excel</span></button><button class="secondary-btn"><i data-lucide="file-text"></i><span>PDF</span></button><button class="secondary-btn"><i data-lucide="database"></i><span>CSV</span></button></div>
+          </div>
+          <div class="report-grid">
+            <button><i data-lucide="calendar-days"></i><strong>Diário</strong><span>Pedidos, vendas e horários de pico.</span></button>
+            <button><i data-lucide="calendar-range"></i><strong>Semanal</strong><span>Recorrência, produtos e margem.</span></button>
+            <button><i data-lucide="calendar"></i><strong>Mensal</strong><span>Receita, lucro e crescimento.</span></button>
+            <button><i data-lucide="utensils"></i><strong>Produtos</strong><span>Mais vendidos e baixa saída.</span></button>
+            <button><i data-lucide="users-round"></i><strong>Clientes</strong><span>Novos, recorrentes e inativos.</span></button>
+            <button><i data-lucide="bike"></i><strong>Entregas</strong><span>Taxa fixa, tempo médio e status.</span></button>
+          </div>
+        </section>
+
+        <section class="view" id="ai">
+          <div class="page-heading"><div><span class="eyebrow">OpenAI ready</span><h1>Inteligência artificial</h1></div></div>
+          <div class="content-grid two-col">
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Cadastro inteligente</span><h2>Produto em segundos</h2></div></div>
+              <div class="ai-box">
+                <input id="aiInput" value="X Bacon 39" />
+                <button class="primary-btn" id="aiGenerate"><i data-lucide="wand-sparkles"></i><span>Gerar</span></button>
+              </div>
+              <div class="ai-result" id="aiResult"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><div><span class="eyebrow">Marketing, finanças e atendimento</span><h2>Copiloto operacional</h2></div></div>
+              <div class="ai-actions">
+                <button><i data-lucide="megaphone"></i><span>Promoção da noite</span></button>
+                <button><i data-lucide="instagram"></i><span>Legenda Instagram</span></button>
+                <button><i data-lucide="message-circle"></i><span>Mensagem WhatsApp</span></button>
+                <button><i data-lucide="chart-no-axes-combined"></i><span>Relatório semanal</span></button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="super">
+          <div class="page-heading"><div><span class="eyebrow">Controle SaaS</span><h1>Super Administrador</h1></div></div>
+          <div class="metrics-grid">
+            <article class="metric-card"><span>Empresas</span><strong>124</strong><small>Banco isolado por tenant</small></article>
+            <article class="metric-card"><span>Assinaturas</span><strong>R$ 23.436</strong><small>MRR estimado</small></article>
+            <article class="metric-card"><span>Planos ativos</span><strong>3</strong><small>Starter, Pro, Business</small></article>
+            <article class="metric-card"><span>Suporte</span><strong>12</strong><small>Tickets abertos</small></article>
+          </div>
+          <div class="table-panel">
+            <table>
+              <thead><tr><th>Empresa</th><th>Plano</th><th>Status</th><th>Pedidos/mês</th><th>Pagamento</th><th>Logs</th></tr></thead>
+              <tbody>
+                <tr><td>Daniel Lanches</td><td>Business</td><td><span class="tag success">Ativa</span></td><td>1.842</td><td>Mercado Pago</td><td>Hoje 19:58</td></tr>
+                <tr><td>Pizzaria Via Norte</td><td>Pro</td><td><span class="tag success">Ativa</span></td><td>932</td><td>PIX</td><td>Hoje 18:12</td></tr>
+                <tr><td>Dark Burger 77</td><td>Starter</td><td><span class="tag warn">Teste</span></td><td>218</td><td>Pendente</td><td>Ontem 23:01</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="settings">
+          <div class="page-heading"><div><span class="eyebrow">Personalização</span><h1>Configurações da loja</h1></div></div>
+          <div class="settings-grid">
+            <label>Logo<input value="daniel-lanches-logo.jpg" /></label>
+            <label>Banner<input value="daniel-lanches-hero.png" /></label>
+            <label>Nome<input value="Daniel Lanches" /></label>
+            <label>WhatsApp<input value="(11) 98888-2026" /></label>
+            <label>Instagram<input value="@daniellanches" /></label>
+            <label>PIX<input value="pix@daniellanches.com" /></label>
+            <label>Mercado Pago<select><option>Conectado</option><option>Desativado</option></select></label>
+            <label>Impressora<select><option>Cozinha 80mm</option><option>Caixa 58mm</option></select></label>
+            <label>Tema<select><option>Daniel Premium</option><option>Alto contraste</option></select></label>
+          </div>
+        </section>
+
+      </main>
+    </div>
+    </div>
+    <div class="modal-backdrop" id="loginModal" aria-hidden="true">
+      <section class="modal-card">
+        <button class="icon-btn modal-close" data-close-modal="loginModal" aria-label="Fechar"><i data-lucide="x"></i></button>
+        <span class="eyebrow">Cliente</span>
+        <h2>Entrar ou cadastrar</h2>
+        <p>Para finalizar o pedido, informe seus dados. A sessão fica ativa para acompanhar o status em tempo real.</p>
+        <div class="form-grid">
+          <label>E-mail<input id="loginEmail" type="email" placeholder="cliente@daniellanches.com" /></label>
+          <label>Senha<input id="loginPassword" type="password" placeholder="Sua senha" /></label>
+          <label>Nome<input id="loginName" placeholder="Seu nome" /></label>
+          <label>Telefone<input id="loginPhone" placeholder="(11) 99999-9999" /></label>
+          <label class="full-field">Endereço salvo<input id="loginAddress" placeholder="Seu endereço" /></label>
+        </div>
+        <button class="primary-btn full" id="loginConfirmBtn"><i data-lucide="log-in"></i><span>Continuar</span></button>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">
+      <section class="modal-card checkout-modal">
+        <button class="icon-btn modal-close" data-close-modal="checkoutModal" aria-label="Fechar"><i data-lucide="x"></i></button>
+        <span class="eyebrow">Checkout</span>
+        <h2>Finalizar pedido</h2>
+        <div class="checkout-grid">
+          <div>
+            <div id="checkoutSummary" class="checkout-summary"></div>
+            <label>Observações<textarea id="checkoutNotes" placeholder="Ex: sem cebola, ponto da carne, referência do endereço"></textarea></label>
+          </div>
+          <div class="checkout-side">
+            <label>Entrega ou retirada<select id="checkoutDeliveryMode"><option>Entrega no endereço</option><option>Retirada no local</option></select></label>
+            <label>Endereço salvo<input id="checkoutAddress" /></label>
+            <label>Forma de pagamento<select id="checkoutPayment"><option>Pix</option><option>Dinheiro</option><option>Cartão</option></select></label>
+            <label id="changeField">Troco para<input id="checkoutChange" placeholder="Ex: R$ 100,00" /></label>
+            <button class="primary-btn full" id="confirmOrderBtn"><i data-lucide="badge-check"></i><span>Confirmar pedido</span></button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="orderDetailsModal" aria-hidden="true">
+      <section class="modal-card order-modal">
+        <button class="icon-btn modal-close" data-close-modal="orderDetailsModal" aria-label="Fechar"><i data-lucide="x"></i></button>
+        <div id="orderDetailsContent"></div>
+      </section>
+    </div>
+    <div class="toast" id="toast"><i data-lucide="bell-ring"></i><span>Novo pedido recebido</span></div>
+  </body>
+</html>
