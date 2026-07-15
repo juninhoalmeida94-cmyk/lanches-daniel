@@ -466,40 +466,49 @@ function applyRoute() {
   const route = normalizeRoute(window.location.pathname);
   const publicRoot = document.getElementById("publicAppRoot");
   const adminRoot = document.getElementById("adminAppRoot");
+
   if (!publicRoot || !adminRoot) return;
+
   const isAdmin = isAdminRoute(route);
+
   publicRoot.style.display = isAdmin ? "none" : "block";
   adminRoot.style.display = isAdmin ? "block" : "none";
 
-  if (!isAdminAllowed() || !canAccessRoute(route)) {
-  if (window.location.pathname !== "/admin/login") {
-    window.history.replaceState({}, "", "/admin/login");
-  }
+  if (isAdmin) {
+    if (!isAdminAllowed() || !canAccessRoute(route)) {
+      if (window.location.pathname !== "/admin/login") {
+        window.history.replaceState({}, "", "/admin/login");
+      }
 
-  setActiveView("login");
+      setActiveView("login");
 
-  if (window.AdminApp) {
-    window.AdminApp.render();
-    window.AdminApp.renderView("/admin/login");
-  }
+      if (window.AdminApp) {
+        window.AdminApp.render();
+        window.AdminApp.renderView("/admin/login");
+      }
 
-  updateAppRole();
-  return;
-}
+      updateAppRole();
+      return;
     }
+
     const viewId = getRouteView(route);
     setActiveView(viewId);
+
     if (window.AdminApp) {
       window.AdminApp.render();
       window.AdminApp.renderView(route);
     }
+
     updateAppRole();
     return;
   }
 
   updateAppRole();
+
   if (window.PublicApp) {
-    const tab = new URLSearchParams(window.location.search).get("tab") || "menu";
+    const tab =
+      new URLSearchParams(window.location.search).get("tab") || "menu";
+
     window.PublicApp.render(tab);
   }
 }
