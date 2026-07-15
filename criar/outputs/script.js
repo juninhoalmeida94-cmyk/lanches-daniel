@@ -90,7 +90,7 @@ const state = loadState();
 if (!state.categoryFilter) state.categoryFilter = "Todos";
 state.backend = SUPABASE_ENABLED ? "Supabase" : "Local";
 state.authUser = null;
-state.profile = null;
+state.profile = state.profile || null;
 state.editingProductId = state.editingProductId || products[0]?.id || null;
 
 function loadState() {
@@ -127,7 +127,8 @@ function saveLocalSession() {
     orders: state.orders,
     nextOrderNumber: state.nextOrderNumber,
     sales7: state.sales7,
-    backend: state.backend
+    backend: state.backend,
+    profile: state.profile
   };
   localStorage.setItem("danielLanchesRealtime", JSON.stringify(localOnly));
 }
@@ -739,7 +740,11 @@ function renderCart() {
   document.querySelectorAll("#cartSubtotal").forEach(el => { el.textContent = money(cartSubtotal()); });
   document.querySelectorAll("#cartDelivery").forEach(el => { el.textContent = state.cart.length ? money(deliveryFee) : money(0); });
   document.querySelectorAll("#cartTotal").forEach(el => { el.textContent = money(cartTotal()); });
-  document.querySelectorAll("#cartBadge").forEach(el => { el.textContent = state.cart.reduce((sum, item) => sum + item.qty, 0); });
+  document.querySelectorAll("#cartBadge").forEach(el => {
+    const count = state.cart.reduce((sum, item) => sum + item.qty, 0);
+    el.textContent = count || "";
+    el.classList.toggle("show", count > 0);
+  });
   document.querySelectorAll("#finishOrderBtn").forEach(btn => { btn.disabled = !state.cart.length || !state.storeOpen; });
 }
 

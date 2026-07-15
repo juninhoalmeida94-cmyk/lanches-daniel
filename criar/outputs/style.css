@@ -492,18 +492,27 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 }
 .public-store-bar.closed .store-identity span b { background: var(--error); }
 .cart-jump-btn {
-  min-width: 58px;
-  padding: 0 12px;
+  position: relative;
+  min-width: 40px;
+  padding: 0 10px;
 }
 .cart-jump-btn span {
-  min-width: 22px;
-  height: 22px;
-  display: grid;
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 99px;
-  background: var(--black);
-  color: var(--yellow);
-  font-size: 12px;
+  background: var(--yellow);
+  color: var(--black);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.cart-jump-btn span.show {
+  display: grid;
 }
 .section-title-row {
   display: flex;

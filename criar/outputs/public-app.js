@@ -19,6 +19,10 @@
           <button class="ghost-btn" data-public-route="/admin/login"><i data-lucide="shield-check"></i><span>Painel admin</span></button>
           <span class="status-pill" id="publicHeaderStatus">Aberto agora</span>
           <span class="status-pill muted">Entrega 35-45 min</span>
+          <button class="icon-btn cart-jump-btn" aria-label="Ver carrinho">
+            <i data-lucide="shopping-bag"></i>
+            <span id="cartBadge"></span>
+          </button>
         </div>
       </header>
     `;
