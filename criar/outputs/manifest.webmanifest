@@ -1,7 +1,7 @@
 {
   "name": "Daniel Lanches OS",
   "short_name": "Daniel Lanches",
-  "description": "Painel de operação e cardápio público da Daniel Lanches: pedidos, cardápio, entregas, cupons e financeiro em tempo real.",
+  "description": "Painel de operação e cardápio público da Daniel Lanches: pedidos, cardápio, checkout e acompanhamento em tempo real.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
