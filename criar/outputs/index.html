@@ -1,32 +1,35 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Daniel Lanches OS</title>
-    <meta name="theme-color" content="#1A1A1A" />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" type="image/png" sizes="192x192" href="daniel-lanches-icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="daniel-lanches-icon-512.png" />
-    <link rel="apple-touch-icon" href="daniel-lanches-icon-192.png" />
-    <link rel="preconnect" href="https://unpkg.com" />
-    <link rel="stylesheet" href="style.css" />
-    <script src="/env.js"></script>
-    <!-- Versões fixas com SRI — gere os hashes reais antes de produção:
-         https://www.srihash.org/ -->
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"
-      integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"
-      crossorigin="anonymous"></script>
-    <script
-      defer
-      src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"
-      integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu"
-      crossorigin="anonymous"></script>
-    <script defer src="script.js"></script>
-    <script defer src="public-app.js"></script>
-  </head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daniel Lanches OS</title>
+  <meta name="theme-color" content="#1A1A1A" />
+
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/daniel-lanches-icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/daniel-lanches-icon-512.png" />
+  <link rel="apple-touch-icon" href="/daniel-lanches-icon-192.png" />
+
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/env.js"></script>
+
+  <!-- Versões fixas com SRI -->
+  <script
+    defer
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"
+    integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"
+    crossorigin="anonymous"></script>
+  <script
+    defer
+    src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"
+    integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu"
+    crossorigin="anonymous"></script>
+
+  <script defer src="/script.js"></script>
+  <script defer src="/public-app.js"></script>
+</head>
   <body>
     <div id="publicAppRoot"></div>
     <div id="adminAppRoot">

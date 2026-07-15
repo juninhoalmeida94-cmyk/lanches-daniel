@@ -1,5 +1,5 @@
 // Bump this on every deploy so old caches get cleared out automatically.
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 const CACHE_NAME = `daniel-lanches-os-${CACHE_VERSION}`;
 const OFFLINE_URL = "./offline.html";
 
