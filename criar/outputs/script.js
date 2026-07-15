@@ -471,11 +471,21 @@ function applyRoute() {
   publicRoot.style.display = isAdmin ? "none" : "block";
   adminRoot.style.display = isAdmin ? "block" : "none";
 
-  if (isAdmin) {
-    if (!isAdminAllowed() || !canAccessRoute(route)) {
-      window.history.replaceState({}, "", "/admin/login");
-      applyRoute();
-      return;
+  if (!isAdminAllowed() || !canAccessRoute(route)) {
+  if (window.location.pathname !== "/admin/login") {
+    window.history.replaceState({}, "", "/admin/login");
+  }
+
+  setActiveView("login");
+
+  if (window.AdminApp) {
+    window.AdminApp.render();
+    window.AdminApp.renderView("/admin/login");
+  }
+
+  updateAppRole();
+  return;
+}
     }
     const viewId = getRouteView(route);
     setActiveView(viewId);
