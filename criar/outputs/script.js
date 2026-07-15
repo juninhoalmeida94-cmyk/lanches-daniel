@@ -1293,7 +1293,7 @@ function generateAiProduct() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("/sw.js")
+    navigator.serviceWorker.register("./sw.js")
   }
 
   renderAll();
