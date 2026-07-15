@@ -481,7 +481,7 @@ function applyRoute() {
         window.history.replaceState({}, "", "/admin/login");
       }
 
-      setActiveView("login");
+      setActiveView("auth");
 
       if (window.AdminApp) {
         window.AdminApp.render();
@@ -1293,7 +1293,7 @@ function generateAiProduct() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js")
   }
 
   renderAll();

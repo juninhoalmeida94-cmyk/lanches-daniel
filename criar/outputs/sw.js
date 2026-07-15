@@ -1,5 +1,5 @@
 // Aumente esta versão sempre que alterar HTML, CSS ou JavaScript.
-const CACHE_VERSION = "v9";
+const CACHE_VERSION = "v10";
 const CACHE_NAME = `daniel-lanches-os-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
