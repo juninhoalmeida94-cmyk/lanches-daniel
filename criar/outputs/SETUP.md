@@ -41,14 +41,13 @@ Cria: `profiles`, `products`, `orders`, `store_settings`, triggers de validaçã
 
 ### 2. Credenciais
 
-No início de `script.js`:
+Crie/edite o arquivo `env.js` na raiz:
 
 ```js
-const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
-const SUPABASE_ANON_KEY = "SUA_ANON_KEY";
-```
-
-Use sempre a chave `anon`/publishable. Nunca exponha a `service_role`.
+window.__ENV__ = {
+  SUPABASE_URL: "https://SEU-PROJETO.supabase.co",
+  SUPABASE_ANON_KEY: "SUA_ANON_KEY"
+};.
 
 ### 3. Auth
 

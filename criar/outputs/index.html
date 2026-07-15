@@ -11,8 +11,19 @@
     <link rel="apple-touch-icon" href="daniel-lanches-icon-192.png" />
     <link rel="preconnect" href="https://unpkg.com" />
     <link rel="stylesheet" href="style.css" />
-    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="/env.js"></script>
+    <!-- Versões fixas com SRI — gere os hashes reais antes de produção:
+         https://www.srihash.org/ -->
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"
+      integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"
+      crossorigin="anonymous"></script>
+    <script
+      defer
+      src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"
+      integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu"
+      crossorigin="anonymous"></script>
     <script defer src="script.js"></script>
     <script defer src="public-app.js"></script>
   </head>

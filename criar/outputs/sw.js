@@ -1,5 +1,5 @@
 // Bump this on every deploy so old caches get cleared out automatically.
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 const CACHE_NAME = `daniel-lanches-os-${CACHE_VERSION}`;
 const OFFLINE_URL = "./offline.html";
 
@@ -51,8 +51,10 @@ self.addEventListener("fetch", event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          if (response && response.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() =>
@@ -68,7 +70,7 @@ self.addEventListener("fetch", event => {
     caches.match(request).then(cached => {
       const networkFetch = fetch(request)
         .then(response => {
-          if (response && response.ok) {
+          if (response && response.ok && response.type === "basic") {
             const copy = response.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
           }

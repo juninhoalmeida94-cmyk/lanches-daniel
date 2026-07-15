@@ -3,10 +3,9 @@ let minimumOrder = 25;
 const STATUS_FLOW = ["Novo", "Em preparo", "Saiu para entrega", "Entregue"];
 const ADMIN_COLUMNS = ["Novo", "Em preparo", "Saiu para entrega", "Entregue", "Cancelado"];
 
-// Fill these two values after creating your Supabase project.
-// The app keeps working locally while they are empty.
-const SUPABASE_URL = "https://pfgsckdknujsriljeila.supabase.co/";
-const SUPABASE_ANON_KEY = "sb_publishable_IafCHAv4RDJNRFIKjQBqtA_zXYtdsf2";
+const ENV = window.__ENV__ || {};
+const SUPABASE_URL = String(ENV.SUPABASE_URL || "").trim();
+const SUPABASE_ANON_KEY = String(ENV.SUPABASE_ANON_KEY || "").trim();
 const SUPABASE_ENABLED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
 let supabaseDb = null;
 let realtimeChannel = null;
@@ -811,15 +810,21 @@ function renderDashboard() {
 
 function renderMyOrders() {
   document.querySelectorAll("#myOrdersList").forEach(container => {
-    const mine = state.loggedIn ? state.orders.filter(order => order.phone === state.customer.phone) : [];
     if (!state.loggedIn) {
       container.innerHTML = `<section class="panel"><h2>Entre para ver seus pedidos</h2><p>Use o cadastro rápido para acompanhar seus pedidos em tempo real.</p><button class="primary-btn" id="myOrdersLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button></section>`;
       return;
     }
+
+    // Com Supabase + RLS, state.orders já vem apenas do usuário autenticado (ou staff).
+    const mine = usingSupabase()
+      ? state.orders
+      : state.orders.filter(order => order.phone === state.customer.phone);
+
     if (!mine.length) {
       container.innerHTML = `<section class="panel"><h2>Nenhum pedido ainda</h2><p>Quando você finalizar um pedido, ele aparece aqui automaticamente.</p></section>`;
       return;
     }
+
     container.innerHTML = mine.map(order => `
       <section class="panel my-order-card">
         <div class="panel-head"><div><span class="eyebrow">${escapeHtml(order.id)}</span><h2>${money(orderTotal(order))}</h2></div><strong>${escapeHtml(order.status)}</strong></div>
@@ -958,27 +963,16 @@ async function confirmLogin() {
       showToast("Informe e-mail e senha");
       return;
     }
-    let { error } = await supabaseDb.auth.signInWithPassword({ email, password });
+
+    const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
     if (error) {
-      const signUp = await supabaseDb.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: state.customer.name, phone: state.customer.phone, role: "customer" } }
-      });
-      if (signUp.error) {
-        console.error(signUp.error);
-        showToast("Não foi possível entrar/cadastrar");
-        return;
-      }
-      if (!signUp.data.session) {
-        showToast("Confirme seu e-mail antes de finalizar");
-        return;
-      }
-      state.authUser = signUp.data.user;
-    } else {
-      const { data } = await supabaseDb.auth.getUser();
-      state.authUser = data.user;
+      showToast("Login inválido. Use cadastro separado.");
+      return;
     }
+
+    const { data } = await supabaseDb.auth.getUser();
+    state.authUser = data.user;
+
     try {
       await upsertCustomerProfile();
     } catch (profileError) {
