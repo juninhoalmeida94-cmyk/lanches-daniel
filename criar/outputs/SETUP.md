@@ -47,7 +47,8 @@ Crie/edite o arquivo `env.js` na raiz:
 window.__ENV__ = {
   SUPABASE_URL: "https://SEU-PROJETO.supabase.co",
   SUPABASE_ANON_KEY: "SUA_ANON_KEY"
-};.
+};
+```
 
 ### 3. Auth
 
@@ -78,6 +79,31 @@ set role = 'admin',
 - somente admin/super_admin exclui pedidos e produtos
 
 ---
+
+## Deploy GitHub Pages
+
+O deploy oficial usa `.github/workflows/deploy.yml`.
+
+No GitHub, configure em **Settings → Secrets and variables → Actions → New repository secret**:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+A cada push na branch `main`, o workflow:
+
+1. baixa o repositório
+2. gera `outputs/env.js` a partir dos secrets
+3. publica a pasta `outputs` no GitHub Pages
+
+O arquivo `env.js` real não deve ser commitado. Ele fica protegido pelo `.gitignore`.
+
+### Rotas do SPA
+
+GitHub Pages não tem rewrite de servidor como Netlify. Por isso, o projeto usa `404.html` + um pequeno script no `index.html`: rotas como `/cardapio` e `/admin/login` voltam para o SPA sem perder o caminho.
+
+### Limitação de headers
+
+Os arquivos `_headers` e `_redirects` eram específicos de Netlify e foram removidos. GitHub Pages não aplica `X-Frame-Options`, CSP ou HSTS por arquivo estático. Se esses headers forem obrigatórios em produção, coloque Cloudflare ou outro proxy/CDN na frente do GitHub Pages.
 
 ## Deploy e cache
 

@@ -1,0 +1,7 @@
+env.js
+outputs/env.js
+!env.example.js
+!outputs/env.example.js
+
+.DS_Store
+Thumbs.db

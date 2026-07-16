@@ -6,14 +6,24 @@
   <title>Daniel Lanches OS</title>
   <meta name="theme-color" content="#1A1A1A" />
 
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/daniel-lanches-icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/daniel-lanches-icon-512.png" />
-  <link rel="apple-touch-icon" href="/daniel-lanches-icon-192.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./daniel-lanches-icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./daniel-lanches-icon-512.png" />
+  <link rel="apple-touch-icon" href="./daniel-lanches-icon-192.png" />
 
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="./style.css">
 <script src="./env.js"></script>
+<script>
+  (function restoreGitHubPagesRoute() {
+    const redirect = sessionStorage.getItem("daniel:lanches:redirect");
+    if (!redirect) return;
+    sessionStorage.removeItem("daniel:lanches:redirect");
+    if (redirect !== window.location.href) {
+      history.replaceState(null, "", redirect);
+    }
+  })();
+</script>
 
   <!-- Versões fixas com SRI -->
   <script
@@ -94,12 +104,12 @@
               <form class="auth-form">
                 <label>E-mail<input id="adminEmail" type="email" placeholder="admin@example.com" /></label>
                 <label>Senha<input id="adminPassword" type="password" placeholder="••••••••" /></label>
-<button class="primary-btn full" type="button" id="adminLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button>
+                <button class="primary-btn full" type="button" id="adminLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button>
               </form>
               <div class="auth-tabs">
-                <button>Cadastro</button>
-                <button>Recuperar senha</button>
-                <button>2FA futuro</button>
+                <span>Contas de equipe são criadas por um admin.</span>
+                <button type="button" id="adminResetPasswordBtn">Recuperar senha</button>
+                <span class="muted-badge">2FA futuro</span>
               </div>
             </section>
             <section class="panel">
@@ -432,6 +442,7 @@
           <label class="full-field">Endereço salvo<input id="loginAddress" placeholder="Seu endereço" /></label>
         </div>
         <button class="primary-btn full" id="loginConfirmBtn"><i data-lucide="log-in"></i><span>Continuar</span></button>
+        <button class="ghost-btn full" id="loginResetPasswordBtn" type="button"><i data-lucide="key-round"></i><span>Recuperar senha</span></button>
       </section>
     </div>
     <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">

@@ -343,6 +343,15 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 .session-pill svg { width: 18px; height: 18px; color: var(--success); }
 .auth-form { display: grid; gap: 12px; }
 .auth-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.auth-tabs span {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--soft);
+}
 .auth-tabs button {
   min-height: 38px;
   padding: 0 12px;
@@ -350,6 +359,10 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
   background: var(--soft);
   color: var(--black);
   font-weight: 800;
+}
+.auth-tabs .muted-badge {
+  background: #f1f1f1;
+  color: #777;
 }
 .permission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .permission-grid div {

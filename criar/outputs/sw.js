@@ -1,29 +1,40 @@
 // Aumente esta versão sempre que alterar HTML, CSS ou JavaScript.
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v12";
 const CACHE_NAME = `daniel-lanches-os-${CACHE_VERSION}`;
-const OFFLINE_URL = "/offline.html";
+const scopeUrl = new URL(self.registration.scope);
+const scopedUrl = asset => new URL(asset, scopeUrl).toString();
+const OFFLINE_URL = scopedUrl("offline.html");
 
 const ASSETS = [
-  "/",
-  "/index.html",
-  "/style.css",
-  "/script.js",
-  "/public-app.js",
-  "/env.js",
-  "/manifest.webmanifest",
-  "/offline.html",
-  "/daniel-lanches-hero.png",
-  "/daniel-lanches-logo.jpg",
-  "/daniel-lanches-icon-192.png",
-  "/daniel-lanches-icon-512.png",
-  "/daniel-lanches-icon-maskable-512.png"
+  "./",
+  "index.html",
+  "style.css",
+  "script.js",
+  "public-app.js",
+  "env.js",
+  "manifest.webmanifest",
+  "offline.html",
+  "404.html",
+  "daniel-lanches-hero.png",
+  "daniel-lanches-logo.jpg",
+  "daniel-lanches-icon-192.png",
+  "daniel-lanches-icon-512.png",
+  "daniel-lanches-icon-maskable-512.png"
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
+      .then(cache =>
+        Promise.allSettled(
+          ASSETS.map(asset =>
+            cache.add(scopedUrl(asset)).catch(error => {
+              console.warn("[sw] asset ignorado no cache:", asset, error);
+            })
+          )
+        )
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -71,7 +82,7 @@ self.addEventListener("fetch", event => {
           const cachedPage = await caches.match(request);
           if (cachedPage) return cachedPage;
 
-          const indexPage = await caches.match("/index.html");
+          const indexPage = await caches.match(scopedUrl("index.html"));
           if (indexPage) return indexPage;
 
           return caches.match(OFFLINE_URL);

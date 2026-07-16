@@ -990,12 +990,34 @@ async function confirmLogin() {
 
     const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
     if (error) {
-      showToast("Login inválido. Use cadastro separado.");
-      return;
-    }
+      const signUp = await supabaseDb.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: state.customer.name,
+            phone: state.customer.phone,
+            role: "customer"
+          }
+        }
+      });
 
-    const { data } = await supabaseDb.auth.getUser();
-    state.authUser = data.user;
+      if (signUp.error) {
+        console.error(signUp.error);
+        showToast("Não foi possível entrar ou cadastrar");
+        return;
+      }
+
+      if (!signUp.data.session) {
+        showToast("Cadastro criado. Confirme seu e-mail antes de finalizar.");
+        return;
+      }
+
+      state.authUser = signUp.data.user;
+    } else {
+      const { data } = await supabaseDb.auth.getUser();
+      state.authUser = data.user;
+    }
 
     try {
       await upsertCustomerProfile();
@@ -1011,6 +1033,31 @@ async function confirmLogin() {
   closeModal("loginModal");
   renderCheckout();
   openModal("checkoutModal");
+}
+
+async function resetPasswordFor(emailInputId) {
+  if (!usingSupabase()) {
+    showToast("Recuperação de senha exige Supabase configurado");
+    return;
+  }
+
+  const email = document.getElementById(emailInputId)?.value.trim();
+  if (!email) {
+    showToast("Informe o e-mail para recuperar a senha");
+    return;
+  }
+
+  const { error } = await supabaseDb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+
+  if (error) {
+    console.error(error);
+    showToast("Não foi possível enviar o e-mail de recuperação");
+    return;
+  }
+
+  showToast("E-mail de recuperação enviado");
 }
 
 function adminLoginFlow() {
@@ -1341,8 +1388,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("newOrderBtn")?.addEventListener("click", simulateNewOrder);
   document.getElementById("loginConfirmBtn")?.addEventListener("click", confirmLogin);
+  document.getElementById("loginResetPasswordBtn")?.addEventListener("click", () => resetPasswordFor("loginEmail"));
   const adminLoginBtn = document.getElementById("adminLoginBtn");
   if (adminLoginBtn) adminLoginBtn.addEventListener("click", adminLoginFlow);
+  document.getElementById("adminResetPasswordBtn")?.addEventListener("click", () => resetPasswordFor("adminEmail"));
   document.getElementById("confirmOrderBtn")?.addEventListener("click", createOrder);
   document.getElementById("checkoutPayment")?.addEventListener("change", renderCheckout);
   document.getElementById("checkoutDeliveryMode")?.addEventListener("change", renderCheckout);
