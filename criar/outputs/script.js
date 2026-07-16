@@ -2,6 +2,16 @@ let deliveryFee = 7.9;
 let minimumOrder = 25;
 const STATUS_FLOW = ["Novo", "Em preparo", "Saiu para entrega", "Entregue"];
 const ADMIN_COLUMNS = ["Novo", "Em preparo", "Saiu para entrega", "Entregue", "Cancelado"];
+const MENU_ORDER = [
+  "x-bacon",
+  "x-salada",
+  "x-tudo",
+  "combo-duplo",
+  "combo-familia",
+  "batata-cheddar",
+  "coca-cola",
+  "guarana"
+];
 
 const ENV = window.__ENV__ || {};
 const SUPABASE_URL = String(ENV.SUPABASE_URL || "").trim();
@@ -381,6 +391,25 @@ function productToDbPayload(product) {
   };
 }
 
+function productCategoryGroup(category) {
+  const value = String(category || "").toLowerCase();
+  if (["lanche", "lanches", "hambúrguer", "hamburguer", "destaque", "combo", "combos"].includes(value)) return "Lanches";
+  if (["porção", "porções", "porcao", "porcoes", "extra", "extras"].includes(value)) return "Porções";
+  if (["bebida", "bebidas"].includes(value)) return "Bebidas";
+  return category || "Lanches";
+}
+
+function sortProductsByMenuOrder(productList) {
+  return [...productList].sort((a, b) => {
+    const indexA = MENU_ORDER.indexOf(a.id);
+    const indexB = MENU_ORDER.indexOf(b.id);
+    const safeA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA;
+    const safeB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB;
+    if (safeA !== safeB) return safeA - safeB;
+    return String(a.name || "").localeCompare(String(b.name || ""), "pt-BR");
+  });
+}
+
 function orderSubtotal(order) {
   return order.items.reduce((sum, item) => sum + item.price * item.qty, 0);
 }
@@ -576,8 +605,12 @@ function renderStoreStatus() {
 }
 
 function renderProducts() {
-  const availableProducts = products.filter(product => product.available !== false);
-  const visibleProducts = state.categoryFilter === "Todos" ? availableProducts : availableProducts.filter(product => product.category === state.categoryFilter);
+  const availableProducts = sortProductsByMenuOrder(
+    products.filter(product => product.available !== false)
+  );
+  const visibleProducts = state.categoryFilter === "Todos"
+    ? availableProducts
+    : availableProducts.filter(product => productCategoryGroup(product.category) === state.categoryFilter);
   document.querySelectorAll("[data-category-filter]").forEach(button => {
     button.classList.toggle("active", button.dataset.categoryFilter === state.categoryFilter);
   });
@@ -652,7 +685,7 @@ function getProductFormPayload({ duplicate = false } = {}) {
   return {
     id,
     name: duplicate ? `${name} cópia` : name,
-    category: document.getElementById("productFeatured").checked ? "Destaque" : document.getElementById("productCategory").value,
+    category: document.getElementById("productCategory").value,
     description: document.getElementById("productDescription").value.trim(),
     price: parsePrice(document.getElementById("productPrice").value),
     oldPrice: oldPrice > 0 ? oldPrice : null,
@@ -1340,7 +1373,8 @@ function generateAiProduct() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("./sw.js")
+    const swUrl = new URL("sw.js", window.location.href).toString();
+    navigator.serviceWorker.register(swUrl);
   }
 
   renderAll();

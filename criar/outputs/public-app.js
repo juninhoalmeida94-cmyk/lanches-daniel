@@ -145,10 +145,9 @@
           ` : `
             <div class="category-tabs">
               <button class="active" data-category-filter="Todos">Todos</button>
-              <button data-category-filter="Destaque">Ofertas</button>
-              <button data-category-filter="Hambúrguer">Lanches</button>
-              <button data-category-filter="Combo">Combos</button>
-              <button data-category-filter="Extra">Extras</button>
+              <button data-category-filter="Lanches">Lanches</button>
+              <button data-category-filter="Porções">Porções</button>
+              <button data-category-filter="Bebidas">Bebidas</button>
             </div>
             <div class="section-title-row">
               <h2><i data-lucide="flame"></i> Promoções</h2>
