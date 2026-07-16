@@ -2,6 +2,7 @@ let deliveryFee = 7.9;
 let minimumOrder = 25;
 const STATUS_FLOW = ["Novo", "Em preparo", "Saiu para entrega", "Entregue"];
 const ADMIN_COLUMNS = ["Novo", "Em preparo", "Saiu para entrega", "Entregue", "Cancelado"];
+const BASE_PATH = "/lanches-daniel";
 const MENU_ORDER = [
   "x-bacon",
   "x-salada",
@@ -442,12 +443,21 @@ function setActiveView(viewId) {
 }
 
 function normalizeRoute(pathname = window.location.pathname) {
-  const trimmed = pathname.replace(/\/+$/, "") || "/";
+  let trimmed = pathname.replace(/\/+$/, "") || "/";
+  if (trimmed === BASE_PATH) trimmed = "/";
+  else if (trimmed.startsWith(`${BASE_PATH}/`)) trimmed = trimmed.slice(BASE_PATH.length) || "/";
   if (trimmed === "/cardapio") return "/cardapio";
   if (trimmed === "/") return "/";
   if (trimmed.startsWith("/admin")) return trimmed;
   if (trimmed === "/entregador") return "/entregador";
   return "/";
+}
+
+function routeToUrl(path = "/") {
+  const [pathname, suffix = ""] = String(path || "/").split(/([?#].*)/, 2);
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  if (normalizedPath === "/") return `${BASE_PATH}/${suffix}`;
+  return `${BASE_PATH}${normalizedPath}${suffix}`;
 }
 
 function isAdminRoute(pathname = window.location.pathname) {
@@ -487,7 +497,7 @@ function getRouteView(route) {
 }
 
 function navigateTo(path) {
-  const target = path || "/";
+  const target = routeToUrl(path || "/");
   window.history.pushState({}, "", target);
   applyRoute();
 }
@@ -506,8 +516,9 @@ function applyRoute() {
 
   if (isAdmin) {
     if (!isAdminAllowed() || !canAccessRoute(route)) {
-      if (window.location.pathname !== "/admin/login") {
-        window.history.replaceState({}, "", "/admin/login");
+      const loginUrl = routeToUrl("/admin/login");
+      if (window.location.pathname !== loginUrl) {
+        window.history.replaceState({}, "", loginUrl);
       }
 
       setActiveView("auth");
@@ -929,7 +940,7 @@ function renderAll() {
   }
   if (window.AdminApp && isAdminRoute(window.location.pathname)) {
     window.AdminApp.render();
-    window.AdminApp.renderView(window.location.pathname);
+    window.AdminApp.renderView(normalizeRoute(window.location.pathname));
   }
   iconRefresh();
 }

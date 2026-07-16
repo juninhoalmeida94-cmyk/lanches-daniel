@@ -6,13 +6,8 @@
     <title>Daniel Lanches OS</title>
     <script>
       (function redirectToSpaEntry() {
+        const basePath = "/lanches-daniel/";
         sessionStorage.setItem("daniel:lanches:redirect", window.location.href);
-
-        const pathParts = window.location.pathname.split("/").filter(Boolean);
-        const knownRoutes = ["admin", "cardapio", "checkout", "pedidos", "meus-pedidos", "entregador"];
-        const isProjectPage = window.location.hostname.endsWith("github.io") && pathParts.length && !knownRoutes.includes(pathParts[0]);
-        const basePath = isProjectPage ? `/${pathParts[0]}/` : "/";
-
         window.location.replace(`${window.location.origin}${basePath}`);
       })();
     </script>
