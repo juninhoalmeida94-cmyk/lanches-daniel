@@ -522,36 +522,18 @@ function applyRoute() {
       }
 
       setActiveView("auth");
-
-      if (window.AdminApp) {
-        window.AdminApp.render();
-        window.AdminApp.renderView("/admin/login");
-      }
-
       updateAppRole();
       return;
     }
 
     const viewId = getRouteView(route);
     setActiveView(viewId);
-
-    if (window.AdminApp) {
-      window.AdminApp.render();
-      window.AdminApp.renderView(route);
-    }
-
     updateAppRole();
     return;
   }
 
   updateAppRole();
-
-  if (window.PublicApp) {
-    const tab =
-      new URLSearchParams(window.location.search).get("tab") || "menu";
-
-    window.PublicApp.render(tab);
-  }
+  renderAll();
 }
 
 function showToast(message) {
@@ -927,13 +909,11 @@ function renderCustomerProfile() {
 }
 
 function renderAll() {
-  renderStoreStatus();
-  renderProducts();
-  renderCart();
-  renderKanban();
-  renderDashboard();
-  renderMyOrders();
-  renderCustomerProfile();
+  // Build the DOM shell FIRST: PublicApp.render()/AdminApp.render() replace the
+  // innerHTML of their root, which recreates containers like #publicProducts,
+  // #specialOffers, #cartItems and #myOrdersList. If we fill those containers
+  // before the shell exists (or before it's rebuilt), the content gets wiped
+  // out immediately after and nothing re-fills it.
   if (window.PublicApp && !isAdminRoute(window.location.pathname)) {
     const tab = new URLSearchParams(window.location.search).get("tab") || "menu";
     window.PublicApp.render(tab);
@@ -942,6 +922,14 @@ function renderAll() {
     window.AdminApp.render();
     window.AdminApp.renderView(normalizeRoute(window.location.pathname));
   }
+
+  renderStoreStatus();
+  renderProducts();
+  renderCart();
+  renderKanban();
+  renderDashboard();
+  renderMyOrders();
+  renderCustomerProfile();
   iconRefresh();
 }
 
