@@ -20,9 +20,16 @@ const SUPABASE_ANON_KEY = String(ENV.SUPABASE_ANON_KEY || "").trim();
 const SUPABASE_ENABLED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
 let supabaseDb = null;
 let realtimeChannel = null;
+let isVerifyingSession = true;
 
 function usingSupabase() {
   return SUPABASE_ENABLED && !!supabaseDb;
+}
+
+function setVerifyingSession(value, message = "") {
+  isVerifyingSession = value;
+  const status = document.getElementById("adminSessionStatus");
+  if (status) status.textContent = value ? "Verificando sessão..." : message;
 }
 
 let products = [
@@ -102,7 +109,6 @@ if (!state.categoryFilter) state.categoryFilter = "Todos";
 state.backend = SUPABASE_ENABLED ? "Supabase" : "Local";
 state.authUser = null;
 state.profile = state.profile || null;
-state.authChecking = SUPABASE_ENABLED;
 state.editingProductId = state.editingProductId || products[0]?.id || null;
 
 function loadState() {
@@ -229,38 +235,52 @@ function recomputeSales7() {
 async function initSupabaseBackend() {
   if (!SUPABASE_ENABLED || !window.supabase) {
     state.backend = "Local";
-    state.authChecking = false;
-    renderBackendNotice();
+    setVerifyingSession(false, "");
     applyRoute();
+    renderBackendNotice();
     return;
   }
-  supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   try {
-    const { data: sessionData, error: sessionError } = await supabaseDb.auth.getSession();
-    if (sessionError) {
-      console.error(sessionError);
-      setAdminLoginError("Não foi possível verificar sua sessão. Tente novamente.");
+    supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const sessionPromise = supabaseDb.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 10000)
+    );
+
+    const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
+    state.authUser = sessionData?.session?.user || null;
+
+    if (state.authUser) {
+      try { await loadProfile(); } catch (error) { console.error(error); }
     }
-    state.authUser = sessionData.session?.user || null;
-    if (state.authUser) await loadProfile();
-  } finally {
-    state.authChecking = false;
-  }
-  // applyRoute() may have already run (from DOMContentLoaded) before this
-  // session check finished, and could have wrongly bounced an authenticated
-  // user to /admin/login. Re-run it now that state.authUser/state.profile
-  // reflect the real session, so the correct view is shown.
-  applyRoute();
-  supabaseDb.auth.onAuthStateChange(async (_event, session) => {
-    state.authUser = session?.user || null;
-    state.profile = null;
-    if (state.authUser) await loadProfile();
+
+    supabaseDb.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        state.authUser = session?.user || null;
+        state.profile = null;
+        if (state.authUser) await loadProfile();
+        await refreshFromSupabase();
+      } catch (error) {
+        console.error("onAuthStateChange error:", error);
+      } finally {
+        setVerifyingSession(false, "");
+        applyRoute();
+      }
+    });
+
     await refreshFromSupabase();
+    subscribeRealtime();
+  } catch (error) {
+    console.error("initSupabaseBackend error:", error);
+    state.authUser = null;
+    state.profile = null;
+  } finally {
+    setVerifyingSession(false, "");
     applyRoute();
-  });
-  await refreshFromSupabase();
-  subscribeRealtime();
-  renderBackendNotice();
+    renderBackendNotice();
+  }
 }
 
 async function loadProfile() {
@@ -558,7 +578,7 @@ function renderAuthLayout(route) {
   if (authShell) authShell.style.display = isLoginRoute ? "grid" : "none";
   if (adminRoot) adminRoot.style.display = isLoginRoute ? "none" : adminRoot.style.display;
   if (publicRoot && isLoginRoute) publicRoot.style.display = "none";
-  if (isLoginRoute) setAdminSessionChecking(!!state.authChecking);
+  if (isLoginRoute) setAdminSessionChecking(isVerifyingSession);
 }
 
 function applyRoute() {
@@ -568,6 +588,14 @@ function applyRoute() {
   const adminRoot = document.getElementById("adminAppRoot");
 
   if (!publicRoot || !adminRoot) return;
+
+  if (isVerifyingSession) {
+    if (route.startsWith("/admin")) {
+      publicRoot.style.display = "none";
+      adminRoot.style.display = "none";
+    }
+    return;
+  }
 
   if (route.startsWith("/admin")) {
     if (route === "/admin/login") {
@@ -1442,10 +1470,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderAll();
+  applyRoute();
   initSupabaseBackend();
   generateAiProduct();
   fillProductForm(products.find(product => product.id === state.editingProductId) || products[0]);
-  applyRoute();
 
   document.addEventListener("click", (event) => {
     const navItem = event.target.closest(".nav-item");
