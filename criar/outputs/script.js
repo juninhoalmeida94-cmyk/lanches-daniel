@@ -574,9 +574,26 @@ function setAdminSessionChecking(checking) {
 }
 
 function googleRedirectTo() {
-  return window.location.hostname === "localhost"
-    ? `${window.location.origin}/admin/dashboard`
-    : `${window.location.origin}/lanches-daniel/admin/dashboard`;
+  return `${window.location.origin}${BASE_PATH}/admin/login`;
+}
+
+function consumeOAuthErrorFromUrl() {
+  const url = new URL(window.location.href);
+  const error = url.searchParams.get("error");
+  const desc = url.searchParams.get("error_description") || "";
+
+  if (!error) return;
+
+  if (error === "invalid_request" && desc.includes("OAuth state not found")) {
+    setAdminLoginError("Sessão OAuth expirada. Clique em “Continuar com Google” novamente.");
+  } else {
+    setAdminLoginError(`Falha no login social: ${error}`);
+  }
+
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_code");
+  url.searchParams.delete("error_description");
+  window.history.replaceState({}, "", url.toString());
 }
 
 function renderAuthLayout(route) {
@@ -1481,6 +1498,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderAll();
   applyRoute();
+  consumeOAuthErrorFromUrl();
   initSupabaseBackend();
   generateAiProduct();
   fillProductForm(products.find(product => product.id === state.editingProductId) || products[0]);
@@ -1549,12 +1567,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (error) {
         console.error(error);
-        setAdminLoginError("Não foi possível entrar com Google. Tente novamente.");
+        setAdminLoginError("Não foi possível iniciar login com Google.");
+        setAdminLoginLoading(false);
       }
     } catch (error) {
       console.error(error);
-      setAdminLoginError("Falha ao iniciar login com Google. Tente novamente.");
-    } finally {
+      setAdminLoginError("Falha ao iniciar login com Google.");
       setAdminLoginLoading(false);
     }
   });
