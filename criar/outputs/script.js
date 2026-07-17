@@ -304,7 +304,7 @@ async function initSupabaseBackend() {
 
     const sessionPromise = supabaseDb.auth.getSession();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 1000)
+      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 2000)
     );
 
     const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
