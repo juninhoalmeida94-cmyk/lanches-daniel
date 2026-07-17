@@ -1599,9 +1599,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const { data, error } = await supabaseDb.auth.signInWithPassword({ email, password });
+      const loginPromise = supabaseDb.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("LOGIN_TIMEOUT")), 12000)
+      );
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]);
       if (error) {
-        setAdminLoginError("E-mail ou senha inválidos.");
+        setAdminLoginError(error?.message || "E-mail ou senha inválidos.");
         return;
       }
 
@@ -1618,6 +1623,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       await refreshFromSupabase();
       navigateTo("/admin/dashboard");
+    } catch (error) {
+      console.error(error);
+      if (error.message === "LOGIN_TIMEOUT") {
+        setAdminLoginError("Tempo excedido ao entrar. Verifique internet/Supabase e tente novamente.");
+      } else {
+        setAdminLoginError("Falha ao entrar. Tente novamente.");
+      }
     } finally {
       setAdminLoginLoading(false);
     }
