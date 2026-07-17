@@ -1,9 +1,8 @@
-name: Deploy GitHub Pages
+name: Deploy Daniel Lanches OS to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -12,31 +11,52 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-and-deploy:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Generate env.js from secrets
+      - name: Assemble static site into outputs/
+        run: |
+          mkdir -p outputs
+          # Copy everything except source-control, workflow, docs and files
+          # that shouldn't ship to production.
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='outputs' \
+            --exclude='env.js' \
+            --exclude='env.example.js' \
+            --exclude='generate-env.js' \
+            --exclude='supabase_schema.sql' \
+            --exclude='SETUP.md' \
+            --exclude='README.md' \
+            ./ outputs/
+
+      - name: Generate real env.js from secrets
         working-directory: outputs
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: node generate-env.js
+        run: node ../generate-env.js
 
-      - name: Upload Pages artifact
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: outputs
