@@ -508,36 +508,66 @@ function navigateTo(path) {
   applyRoute();
 }
 
+function setAdminLoginError(message = "") {
+  const el = document.getElementById("adminLoginError");
+  if (el) el.textContent = message;
+}
+
+function setAdminLoginLoading(loading) {
+  const btn = document.getElementById("adminLoginSubmit");
+  const txt = document.getElementById("adminLoginSubmitText");
+  if (!btn || !txt) return;
+  btn.disabled = loading;
+  txt.textContent = loading ? "Entrando..." : "Entrar";
+}
+
+function renderAuthLayout(route) {
+  const authShell = document.getElementById("authLoginShell");
+  const adminRoot = document.getElementById("adminAppRoot");
+  const publicRoot = document.getElementById("publicAppRoot");
+  const isLoginRoute = route === "/admin/login";
+
+  if (authShell) authShell.style.display = isLoginRoute ? "grid" : "none";
+  if (adminRoot) adminRoot.style.display = isLoginRoute ? "none" : adminRoot.style.display;
+  if (publicRoot && isLoginRoute) publicRoot.style.display = "none";
+}
+
 function applyRoute() {
   const route = normalizeRoute(window.location.pathname);
+  renderAuthLayout(route);
   const publicRoot = document.getElementById("publicAppRoot");
   const adminRoot = document.getElementById("adminAppRoot");
 
   if (!publicRoot || !adminRoot) return;
 
-  const isAdmin = isAdminRoute(route);
-
-  publicRoot.style.display = isAdmin ? "none" : "block";
-  adminRoot.style.display = isAdmin ? "block" : "none";
-
-  if (isAdmin) {
-    if (!isAdminAllowed() || !canAccessRoute(route)) {
-      const loginUrl = routeToUrl("/admin/login");
-      if (window.location.pathname !== loginUrl) {
-        window.history.replaceState({}, "", loginUrl);
+  if (route.startsWith("/admin")) {
+    if (route === "/admin/login") {
+      if (isAdminAllowed() && canAccessRoute("/admin/dashboard")) {
+        navigateTo("/admin/dashboard");
+        return;
       }
 
-      setActiveView("auth");
+      publicRoot.style.display = "none";
+      adminRoot.style.display = "none";
       updateAppRole();
       return;
     }
 
-    const viewId = getRouteView(route);
-    setActiveView(viewId);
+    if (!isAdminAllowed() || !canAccessRoute(route)) {
+      navigateTo("/admin/login");
+      return;
+    }
+
+    publicRoot.style.display = "none";
+    adminRoot.style.display = "block";
+
+    setActiveView(getRouteView(route));
     updateAppRole();
     return;
   }
 
+  publicRoot.style.display = "block";
+  adminRoot.style.display = "none";
   updateAppRole();
   renderAll();
 }
@@ -1417,6 +1447,64 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   document.querySelectorAll("[data-close-modal]").forEach(button => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
+
+  document.getElementById("toggleAdminPassword")?.addEventListener("click", () => {
+    const input = document.getElementById("adminPasswordLogin");
+    const btn = document.getElementById("toggleAdminPassword");
+    if (!input || !btn) return;
+    input.type = input.type === "password" ? "text" : "password";
+    btn.textContent = input.type === "password" ? "Mostrar" : "Ocultar";
+  });
+
+  document.getElementById("adminForgotPasswordLink")?.addEventListener("click", () => {
+    resetPasswordFor("adminEmailLogin");
+  });
+
+  document.getElementById("adminLoginForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setAdminLoginError("");
+    setAdminLoginLoading(true);
+
+    try {
+      const email = document.getElementById("adminEmailLogin")?.value.trim();
+      const password = document.getElementById("adminPasswordLogin")?.value.trim();
+
+      if (!email || !password) {
+        setAdminLoginError("Informe e-mail e senha.");
+        return;
+      }
+
+      if (!usingSupabase()) {
+        state.loggedIn = true;
+        state.profile = { role: "owner" };
+        saveLocalSession();
+        navigateTo("/admin/dashboard");
+        return;
+      }
+
+      const { data, error } = await supabaseDb.auth.signInWithPassword({ email, password });
+      if (error) {
+        setAdminLoginError("E-mail ou senha inválidos.");
+        return;
+      }
+
+      state.authUser = data.user;
+      const profile = await loadProfile();
+
+      if (!isStaffRole(profile?.role)) {
+        await supabaseDb.auth.signOut();
+        state.authUser = null;
+        state.profile = null;
+        setAdminLoginError("Usuário sem permissão de equipe.");
+        return;
+      }
+
+      await refreshFromSupabase();
+      navigateTo("/admin/dashboard");
+    } finally {
+      setAdminLoginLoading(false);
+    }
+  });
 
   document.getElementById("publicMenuBtn")?.addEventListener("click", () => navigateTo("/cardapio"));
   document.getElementById("shareStoreBtn")?.addEventListener("click", () => showToast("Link da loja copiado: daniel.app/pedir"));

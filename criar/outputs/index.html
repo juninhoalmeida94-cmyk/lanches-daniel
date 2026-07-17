@@ -41,6 +41,41 @@
 <script defer src="./public-app.js"></script>
 </head>
   <body>
+    <section id="authLoginShell" class="auth-login-shell" style="display:none;">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="daniel-lanches-logo.jpg" alt="Logo Daniel Lanches" />
+          <strong>Daniel Lanches</strong>
+        </div>
+
+        <h1>Acesse o painel</h1>
+        <p>Gerencie pedidos, produtos e configurações da sua loja.</p>
+
+        <form id="adminLoginForm" class="auth-login-form">
+          <label for="adminEmailLogin">E-mail</label>
+          <input id="adminEmailLogin" type="email" placeholder="admin@exemplo.com" autocomplete="email" />
+
+          <label for="adminPasswordLogin">Senha</label>
+          <div class="password-wrap">
+            <input id="adminPasswordLogin" type="password" placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" id="toggleAdminPassword" class="ghost-btn">Mostrar</button>
+          </div>
+
+          <label class="remember-row">
+            <input id="rememberAdmin" type="checkbox" />
+            <span>Manter conectado</span>
+          </label>
+
+          <button id="adminLoginSubmit" type="submit" class="primary-btn full">
+            <span id="adminLoginSubmitText">Entrar</span>
+          </button>
+
+          <button type="button" id="adminForgotPasswordLink" class="ghost-btn full">Esqueci minha senha</button>
+
+          <div id="adminLoginError" class="auth-error" role="alert" aria-live="polite"></div>
+        </form>
+      </div>
+    </section>
     <div id="publicAppRoot"></div>
     <div id="adminAppRoot">
       <div class="app-shell">

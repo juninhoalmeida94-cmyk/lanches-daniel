@@ -897,3 +897,20 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
   .live-status { grid-template-columns: 1fr 1fr; }
   .latest-orders button { grid-template-columns: 1fr; }
 }
+
+.auth-login-shell{
+  min-height:100vh; display:grid; place-items:center; padding:24px;
+  background:linear-gradient(180deg,#111 0%,#1a1a1a 30%,#f8f9fa 100%);
+}
+.auth-card{
+  width:min(460px,100%); background:#fff; border:1px solid #e9eaec;
+  border-radius:20px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.18);
+}
+.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.auth-brand img{width:40px;height:40px;border-radius:12px;object-fit:cover}
+.auth-login-form{display:grid;gap:10px}
+.auth-login-form input{min-height:46px}
+.password-wrap{display:grid;grid-template-columns:1fr auto;gap:8px}
+.remember-row{display:flex;align-items:center;gap:8px}
+.auth-error{min-height:20px;color:#ef4444;font-weight:700;font-size:13px}
+.auth-login-shell .primary-btn span{display:inline}
