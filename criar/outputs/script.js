@@ -255,7 +255,7 @@ async function initSupabaseBackend() {
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          flowType: "implicit"
+          flowType: "pkce"
         }
       }
     );
@@ -334,6 +334,16 @@ async function initSupabaseBackend() {
         {},
         document.title,
         window.location.pathname + window.location.search
+      );
+    }
+
+    if (new URL(window.location.href).searchParams.has("code")) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("code");
+      history.replaceState(
+        {},
+        document.title,
+        cleanUrl.pathname + cleanUrl.search + cleanUrl.hash
       );
     }
 
