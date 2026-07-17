@@ -1,5 +1,5 @@
 // Aumente esta versão sempre que alterar HTML, CSS ou JavaScript.
-const CACHE_VERSION = "v17";
+const CACHE_VERSION = "v18";
 const CACHE_NAME = `daniel-lanches-os-${CACHE_VERSION}`;
 const scopeUrl = new URL(self.registration.scope);
 const scopedUrl = asset => new URL(asset, scopeUrl).toString();

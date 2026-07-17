@@ -234,23 +234,6 @@ function recomputeSales7() {
   });
 }
 
-async function recoverSessionFromHashIfNeeded() {
-  if (!window.location.hash.includes("access_token")) return;
-
-  const hash = new URLSearchParams(window.location.hash.slice(1));
-  const access_token = hash.get("access_token");
-  const refresh_token = hash.get("refresh_token");
-  if (!access_token || !refresh_token || !supabaseDb) return;
-
-  const { error } = await supabaseDb.auth.setSession({ access_token, refresh_token });
-  if (error) {
-    console.error("setSession(hash) error:", error);
-    setAdminLoginError("Não foi possível concluir o login com Google.");
-  }
-
-  history.replaceState({}, "", window.location.pathname + window.location.search);
-}
-
 async function initSupabaseBackend() {
   if (!SUPABASE_ENABLED || !window.supabase) {
     state.backend = "Local";
@@ -277,56 +260,84 @@ async function initSupabaseBackend() {
       }
     );
 
-    await recoverSessionFromHashIfNeeded();
+    const {
+      data: { session },
+      error: sessionError
+    } = await supabaseDb.auth.getSession();
 
-    supabaseDb.auth.onAuthStateChange(async (event, session) => {
-      if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
+    if (sessionError) throw sessionError;
 
-      const previousUserId = state.authUser?.id || null;
-      const previousRole = state.profile?.role || null;
-
-      try {
-        state.authUser = session?.user || null;
-        state.profile = null;
-        state.loggedIn = !!state.authUser;
-
-        if (state.authUser) await loadProfile();
-      } catch (error) {
-        console.error("onAuthStateChange error:", error);
-      } finally {
-        setVerifyingSession(false, "");
-        const authChanged = previousUserId !== (state.authUser?.id || null)
-          || previousRole !== (state.profile?.role || null);
-        if (authChanged) applyRoute();
-        refreshFromSupabase().catch(error => console.error("refreshFromSupabase error:", error));
-      }
-    });
-
-    const sessionPromise = supabaseDb.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 2000)
-    );
-
-    const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
-    state.authUser = sessionData?.session?.user || null;
+    state.authUser = session?.user || null;
+    state.profile = null;
     state.loggedIn = !!state.authUser;
 
-    if (state.authUser) await loadProfile();
+    if (state.authUser) {
+      await loadProfile();
+    }
 
-    setVerifyingSession(false, "");
-    applyRoute();
-
-    refreshFromSupabase().catch(error => console.error("refreshFromSupabase error:", error));
+    await refreshFromSupabase();
     subscribeRealtime();
+
+    if (
+      state.authUser &&
+      isStaffRole(state.profile?.role) &&
+      normalizeRoute(window.location.pathname) === "/admin/login"
+    ) {
+      history.replaceState({}, "", routeToUrl("/admin/dashboard"));
+    }
+
+    supabaseDb.auth.onAuthStateChange((event, newSession) => {
+      setTimeout(async () => {
+        try {
+          console.log("Auth event:", event);
+
+          state.authUser = newSession?.user || null;
+          state.loggedIn = !!state.authUser;
+
+          if (!state.authUser) {
+            state.profile = null;
+            applyRoute();
+            return;
+          }
+
+          await loadProfile();
+
+          if (!isStaffRole(state.profile?.role)) {
+            setAdminLoginError("Esta conta não possui permissão administrativa.");
+            applyRoute();
+            return;
+          }
+
+          await refreshFromSupabase();
+
+          if (normalizeRoute(window.location.pathname) === "/admin/login") {
+            history.replaceState({}, "", routeToUrl("/admin/dashboard"));
+          }
+
+          applyRoute();
+        } catch (error) {
+          console.error("Auth state error:", error);
+        }
+      }, 0);
+    });
   } catch (error) {
     console.error("initSupabaseBackend error:", error);
     state.authUser = null;
     state.profile = null;
     state.loggedIn = false;
-    setVerifyingSession(false, "");
-    applyRoute();
   } finally {
     isBootstrappingAuth = false;
+    setVerifyingSession(false, "");
+
+    if (window.location.hash.includes("access_token=")) {
+      history.replaceState(
+        {},
+        document.title,
+        window.location.pathname + window.location.search
+      );
+    }
+
+    applyRoute();
     renderBackendNotice();
   }
 }
