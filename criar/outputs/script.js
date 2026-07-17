@@ -108,6 +108,8 @@ const seedOrders = [
 
 const state = loadState();
 if (!state.categoryFilter) state.categoryFilter = "Todos";
+if (!Array.isArray(state.favorites)) state.favorites = [];
+if (!state.sortBy) state.sortBy = "default";
 state.backend = SUPABASE_ENABLED ? "Supabase" : "Local";
 state.authUser = null;
 state.profile = state.profile || null;
@@ -126,6 +128,8 @@ function loadState() {
     customer: { name: "Mariana Souza", phone: "(11) 97777-2201", address: "Rua das Flores, 128" },
     cart: [],
     categoryFilter: "Todos",
+    favorites: [],
+    sortBy: "default",
     orders: seedOrders,
     nextOrderNumber: 1049,
     sales7: [1240, 1780, 1610, 2310, 2140, 2890, 2640]
@@ -144,6 +148,8 @@ function saveLocalSession() {
     customer: state.customer,
     cart: state.cart,
     categoryFilter: state.categoryFilter,
+    favorites: state.favorites,
+    sortBy: state.sortBy,
     orders: state.orders,
     nextOrderNumber: state.nextOrderNumber,
     sales7: state.sales7,
@@ -515,6 +521,12 @@ function productCategoryGroup(category) {
   return category || "Lanches";
 }
 
+function sortProductsByPrice(productList, sortBy) {
+  if (sortBy === "price-asc") return [...productList].sort((a, b) => a.price - b.price);
+  if (sortBy === "price-desc") return [...productList].sort((a, b) => b.price - a.price);
+  return productList;
+}
+
 function sortProductsByMenuOrder(productList) {
   return [...productList].sort((a, b) => {
     const indexA = MENU_ORDER.indexOf(a.id);
@@ -789,16 +801,25 @@ function renderProducts() {
   const availableProducts = sortProductsByMenuOrder(
     products.filter(product => product.available !== false)
   );
-  const visibleProducts = state.categoryFilter === "Todos"
+  const categoryFilteredProducts = state.categoryFilter === "Todos"
     ? availableProducts
+    : state.categoryFilter === "Favoritos"
+    ? availableProducts.filter(product => state.favorites.includes(product.id))
     : availableProducts.filter(product => productCategoryGroup(product.category) === state.categoryFilter);
+  const visibleProducts = sortProductsByPrice(categoryFilteredProducts, state.sortBy);
   document.querySelectorAll("[data-category-filter]").forEach(button => {
     button.classList.toggle("active", button.dataset.categoryFilter === state.categoryFilter);
+  });
+  document.querySelectorAll("[data-sort-select]").forEach(select => {
+    select.value = state.sortBy;
   });
   document.querySelectorAll("#specialOffers").forEach(container => {
     container.innerHTML = availableProducts.filter(product => product.oldPrice).map(product => `
       <article class="offer-card">
         <img src="daniel-lanches-hero.png" alt="" />
+        <button class="fav-btn offer-fav-btn ${state.favorites.includes(product.id) ? "active" : ""}" data-toggle-favorite="${escapeAttr(product.id)}" aria-label="${state.favorites.includes(product.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}">
+          <i data-lucide="heart"></i>
+        </button>
         <span>${escapeHtml(product.badge || "Oferta")}</span>
         <div>
           <h3>${escapeHtml(product.name)}</h3>
@@ -811,9 +832,18 @@ function renderProducts() {
     `).join("");
   });
   document.querySelectorAll("#publicProducts").forEach(container => {
+    if (!visibleProducts.length && state.categoryFilter === "Favoritos") {
+      container.innerHTML = `<div class="empty-cart">Você ainda não favoritou nenhum item. Toque no coração de um produto para salvá-lo aqui.</div>`;
+      return;
+    }
     container.innerHTML = visibleProducts.map(product => `
       <article class="food-card">
-        <img src="daniel-lanches-hero.png" alt="" />
+        <div class="food-card-media">
+          <img src="daniel-lanches-hero.png" alt="" />
+          <button class="fav-btn ${state.favorites.includes(product.id) ? "active" : ""}" data-toggle-favorite="${escapeAttr(product.id)}" aria-label="${state.favorites.includes(product.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}">
+            <i data-lucide="heart"></i>
+          </button>
+        </div>
         <div>
           <span>${escapeHtml(product.category)}</span>
           <h2>${escapeHtml(product.name)}</h2>
@@ -1156,6 +1186,20 @@ function addToCart(productId) {
   saveLocalSession();
   renderAll();
   showToast(`${product.name} adicionado ao carrinho`);
+}
+
+function toggleFavorite(productId) {
+  const product = products.find(item => item.id === productId);
+  const index = state.favorites.indexOf(productId);
+  if (index >= 0) {
+    state.favorites.splice(index, 1);
+    showToast(`${product?.name || "Item"} removido dos favoritos`);
+  } else {
+    state.favorites.push(productId);
+    showToast(`${product?.name || "Item"} adicionado aos favoritos`);
+  }
+  saveLocalSession();
+  renderAll();
 }
 
 function updateCart(productId, delta) {
@@ -1763,6 +1807,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (target.dataset.productEdit) fillProductForm(products.find(product => product.id === target.dataset.productEdit));
+    if (target.dataset.toggleFavorite) { toggleFavorite(target.dataset.toggleFavorite); return; }
     if (target.dataset.addProduct) addToCart(target.dataset.addProduct);
     if (target.dataset.cartInc) updateCart(target.dataset.cartInc, 1);
     if (target.dataset.cartDec) updateCart(target.dataset.cartDec, -1);
@@ -1774,6 +1819,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (target.dataset.print) printOrder(target.dataset.print);
     if (target.dataset.whatsapp) showToast("Mensagem do WhatsApp preparada");
     if (target.id === "myOrdersLoginBtn") openModal("loginModal");
+  });
+
+  document.body.addEventListener("change", event => {
+    const target = event.target;
+    if (target.dataset.sortSelect === undefined) return;
+    state.sortBy = target.value;
+    saveLocalSession();
+    renderProducts();
   });
 
   document.getElementById("sidebarToggle")?.addEventListener("click", () => {

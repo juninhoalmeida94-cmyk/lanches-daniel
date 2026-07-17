@@ -147,6 +147,7 @@
               <button data-category-filter="Lanches">Lanches</button>
               <button data-category-filter="Porções">Porções</button>
               <button data-category-filter="Bebidas">Bebidas</button>
+              <button data-category-filter="Favoritos">Favoritos</button>
             </div>
             <div class="section-title-row">
               <h2><i data-lucide="flame"></i> Promoções</h2>
@@ -155,7 +156,11 @@
             <div id="specialOffers" class="offer-strip"></div>
             <div class="section-title-row menu-section-title">
               <h2><i data-lucide="utensils"></i> Cardápio</h2>
-              <span>Adicione e acompanhe no carrinho</span>
+              <select class="sort-select" data-sort-select aria-label="Ordenar cardápio">
+                <option value="default">Ordenar</option>
+                <option value="price-asc">Menor preço</option>
+                <option value="price-desc">Maior preço</option>
+              </select>
             </div>
             <div class="store-layout">
               <section>

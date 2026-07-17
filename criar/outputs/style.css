@@ -640,7 +640,35 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 .customer-nav-item.active { color: var(--black); background: rgba(255,193,7,.18); }
 .customer-nav-item svg { width: 18px; height: 18px; }
 .food-card { display: grid; grid-template-columns: 168px 1fr 42px; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+.food-card-media { position: relative; }
 .food-card img { width: 168px; height: 132px; object-fit: cover; border-radius: 14px; }
+.fav-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.fav-btn svg { width: 15px; height: 15px; }
+.fav-btn.active { color: var(--error); border-color: var(--error); }
+.fav-btn.active svg { fill: var(--error); }
+.offer-card .fav-btn { top: 12px; left: 12px; right: auto; }
+.sort-select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--black);
+  background: var(--white);
+}
 .food-card span { color: var(--yellow); font-weight: 900; }
 .food-card p { color: var(--text); }
 .food-card strong { font-size: 20px; }
