@@ -21,6 +21,7 @@ const SUPABASE_ENABLED = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KE
 let supabaseDb = null;
 let realtimeChannel = null;
 let isVerifyingSession = true;
+let isBootstrappingAuth = false;
 
 function usingSupabase() {
   return SUPABASE_ENABLED && !!supabaseDb;
@@ -241,25 +242,20 @@ async function initSupabaseBackend() {
     return;
   }
 
+  if (isBootstrappingAuth) return;
+  isBootstrappingAuth = true;
+
   try {
     supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const sessionPromise = supabaseDb.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 10000)
-    );
+    supabaseDb.auth.onAuthStateChange(async (event, session) => {
+      if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
 
-    const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
-    state.authUser = sessionData?.session?.user || null;
-
-    if (state.authUser) {
-      try { await loadProfile(); } catch (error) { console.error(error); }
-    }
-
-    supabaseDb.auth.onAuthStateChange(async (_event, session) => {
       try {
         state.authUser = session?.user || null;
         state.profile = null;
+        state.loggedIn = !!state.authUser;
+
         if (state.authUser) await loadProfile();
         await refreshFromSupabase();
       } catch (error) {
@@ -270,13 +266,26 @@ async function initSupabaseBackend() {
       }
     });
 
+    const sessionPromise = supabaseDb.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 10000)
+    );
+
+    const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
+    state.authUser = sessionData?.session?.user || null;
+    state.loggedIn = !!state.authUser;
+
+    if (state.authUser) await loadProfile();
+
     await refreshFromSupabase();
     subscribeRealtime();
   } catch (error) {
     console.error("initSupabaseBackend error:", error);
     state.authUser = null;
     state.profile = null;
+    state.loggedIn = false;
   } finally {
+    isBootstrappingAuth = false;
     setVerifyingSession(false, "");
     applyRoute();
     renderBackendNotice();
@@ -292,16 +301,17 @@ async function loadProfile() {
     .maybeSingle();
   if (error) {
     console.error(error);
+    state.loggedIn = !!state.authUser;
     return null;
   }
   state.profile = data;
+  state.loggedIn = !!state.authUser;
   if (data) {
     state.customer = {
       name: data.full_name || state.customer.name,
       phone: data.phone || state.customer.phone,
       address: state.customer.address
     };
-    state.loggedIn = true;
     saveLocalSession();
   }
   return data;
