@@ -251,24 +251,29 @@ async function initSupabaseBackend() {
     supabaseDb.auth.onAuthStateChange(async (event, session) => {
       if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
 
+      const previousUserId = state.authUser?.id || null;
+      const previousRole = state.profile?.role || null;
+
       try {
         state.authUser = session?.user || null;
         state.profile = null;
         state.loggedIn = !!state.authUser;
 
         if (state.authUser) await loadProfile();
-        await refreshFromSupabase();
       } catch (error) {
         console.error("onAuthStateChange error:", error);
       } finally {
         setVerifyingSession(false, "");
-        applyRoute();
+        const authChanged = previousUserId !== (state.authUser?.id || null)
+          || previousRole !== (state.profile?.role || null);
+        if (authChanged) applyRoute();
+        refreshFromSupabase().catch(error => console.error("refreshFromSupabase error:", error));
       }
     });
 
     const sessionPromise = supabaseDb.auth.getSession();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 10000)
+      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 4000)
     );
 
     const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
@@ -277,17 +282,20 @@ async function initSupabaseBackend() {
 
     if (state.authUser) await loadProfile();
 
-    await refreshFromSupabase();
+    setVerifyingSession(false, "");
+    applyRoute();
+
+    refreshFromSupabase().catch(error => console.error("refreshFromSupabase error:", error));
     subscribeRealtime();
   } catch (error) {
     console.error("initSupabaseBackend error:", error);
     state.authUser = null;
     state.profile = null;
     state.loggedIn = false;
-  } finally {
-    isBootstrappingAuth = false;
     setVerifyingSession(false, "");
     applyRoute();
+  } finally {
+    isBootstrappingAuth = false;
     renderBackendNotice();
   }
 }
