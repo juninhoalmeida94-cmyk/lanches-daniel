@@ -22,6 +22,7 @@ let supabaseDb = null;
 let realtimeChannel = null;
 let isVerifyingSession = true;
 let isBootstrappingAuth = false;
+let isLoadingProfile = false;
 
 function usingSupabase() {
   return SUPABASE_ENABLED && !!supabaseDb;
@@ -233,6 +234,23 @@ function recomputeSales7() {
   });
 }
 
+async function recoverSessionFromHashIfNeeded() {
+  if (!window.location.hash.includes("access_token")) return;
+
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const access_token = hash.get("access_token");
+  const refresh_token = hash.get("refresh_token");
+  if (!access_token || !refresh_token || !supabaseDb) return;
+
+  const { error } = await supabaseDb.auth.setSession({ access_token, refresh_token });
+  if (error) {
+    console.error("setSession(hash) error:", error);
+    setAdminLoginError("Não foi possível concluir o login com Google.");
+  }
+
+  history.replaceState({}, "", window.location.pathname + window.location.search);
+}
+
 async function initSupabaseBackend() {
   if (!SUPABASE_ENABLED || !window.supabase) {
     state.backend = "Local";
@@ -259,33 +277,7 @@ async function initSupabaseBackend() {
       }
     );
 
-    // Recupera manualmente a sessão do retorno do Google.
-    if (window.location.hash.includes("access_token=")) {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
-
-      if (accessToken && refreshToken) {
-        const { data, error } = await supabaseDb.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        });
-
-        if (error) {
-          console.error("Erro ao recuperar sessão OAuth:", error);
-          setAdminLoginError("Não foi possível concluir o login com Google.");
-        } else {
-          state.authUser = data.session?.user || null;
-          state.loggedIn = !!state.authUser;
-
-          history.replaceState(
-            {},
-            document.title,
-            window.location.pathname + window.location.search
-          );
-        }
-      }
-    }
+    await recoverSessionFromHashIfNeeded();
 
     supabaseDb.auth.onAuthStateChange(async (event, session) => {
       if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
@@ -312,7 +304,7 @@ async function initSupabaseBackend() {
 
     const sessionPromise = supabaseDb.auth.getSession();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 4000)
+      setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 1000)
     );
 
     const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
@@ -341,27 +333,35 @@ async function initSupabaseBackend() {
 
 async function loadProfile() {
   if (!usingSupabase() || !state.authUser) return null;
-  const { data, error } = await supabaseDb
-    .from("profiles")
-    .select("*")
-    .eq("id", state.authUser.id)
-    .maybeSingle();
-  if (error) {
-    console.error(error);
+  isLoadingProfile = true;
+
+  try {
+    const { data, error } = await supabaseDb
+      .from("profiles")
+      .select("*")
+      .eq("id", state.authUser.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      state.loggedIn = !!state.authUser;
+      return null;
+    }
+
+    state.profile = data;
     state.loggedIn = !!state.authUser;
-    return null;
+    if (data) {
+      state.customer = {
+        name: data.full_name || state.customer.name,
+        phone: data.phone || state.customer.phone,
+        address: state.customer.address
+      };
+      saveLocalSession();
+    }
+    return data;
+  } finally {
+    isLoadingProfile = false;
   }
-  state.profile = data;
-  state.loggedIn = !!state.authUser;
-  if (data) {
-    state.customer = {
-      name: data.full_name || state.customer.name,
-      phone: data.phone || state.customer.phone,
-      address: state.customer.address
-    };
-    saveLocalSession();
-  }
-  return data;
 }
 
 async function upsertCustomerProfile() {
@@ -652,7 +652,7 @@ function renderAuthLayout(route) {
   if (authShell) authShell.style.display = isLoginRoute ? "grid" : "none";
   if (adminRoot) adminRoot.style.display = isLoginRoute ? "none" : adminRoot.style.display;
   if (publicRoot && isLoginRoute) publicRoot.style.display = "none";
-  if (isLoginRoute) setAdminSessionChecking(isVerifyingSession);
+  if (isLoginRoute) setAdminSessionChecking(isVerifyingSession || isLoadingProfile);
 }
 
 function applyRoute() {
@@ -663,7 +663,7 @@ function applyRoute() {
 
   if (!publicRoot || !adminRoot) return;
 
-  if (isVerifyingSession) {
+  if (isVerifyingSession || isLoadingProfile) {
     if (route.startsWith("/admin")) {
       publicRoot.style.display = "none";
       adminRoot.style.display = "none";
