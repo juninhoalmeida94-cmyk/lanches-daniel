@@ -912,5 +912,15 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 .auth-login-form input{min-height:46px}
 .password-wrap{display:grid;grid-template-columns:1fr auto;gap:8px}
 .remember-row{display:flex;align-items:center;gap:8px}
+.google-login-btn{
+  min-height:46px; display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; border:1px solid #dadce0; border-radius:12px; background:#fff; color:#1f1f1f;
+  font-weight:800; cursor:pointer;
+}
+.google-login-btn svg{width:20px;height:20px}
+.google-login-btn:disabled{cursor:not-allowed;opacity:.55}
+.auth-spinner{align-items:center;justify-content:center;gap:8px;color:#555;font-size:13px;font-weight:800}
+.auth-spinner span{width:16px;height:16px;border:2px solid #ddd;border-top-color:#1a1a1a;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .auth-error{min-height:20px;color:#ef4444;font-weight:700;font-size:13px}
 .auth-login-shell .primary-btn span{display:inline}

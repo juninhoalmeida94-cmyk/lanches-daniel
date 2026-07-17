@@ -102,6 +102,7 @@ if (!state.categoryFilter) state.categoryFilter = "Todos";
 state.backend = SUPABASE_ENABLED ? "Supabase" : "Local";
 state.authUser = null;
 state.profile = state.profile || null;
+state.authChecking = SUPABASE_ENABLED;
 state.editingProductId = state.editingProductId || products[0]?.id || null;
 
 function loadState() {
@@ -228,13 +229,23 @@ function recomputeSales7() {
 async function initSupabaseBackend() {
   if (!SUPABASE_ENABLED || !window.supabase) {
     state.backend = "Local";
+    state.authChecking = false;
     renderBackendNotice();
+    applyRoute();
     return;
   }
   supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data: sessionData } = await supabaseDb.auth.getSession();
-  state.authUser = sessionData.session?.user || null;
-  if (state.authUser) await loadProfile();
+  try {
+    const { data: sessionData, error: sessionError } = await supabaseDb.auth.getSession();
+    if (sessionError) {
+      console.error(sessionError);
+      setAdminLoginError("Não foi possível verificar sua sessão. Tente novamente.");
+    }
+    state.authUser = sessionData.session?.user || null;
+    if (state.authUser) await loadProfile();
+  } finally {
+    state.authChecking = false;
+  }
   // applyRoute() may have already run (from DOMContentLoaded) before this
   // session check finished, and could have wrongly bounced an authenticated
   // user to /admin/login. Re-run it now that state.authUser/state.profile
@@ -516,9 +527,26 @@ function setAdminLoginError(message = "") {
 function setAdminLoginLoading(loading) {
   const btn = document.getElementById("adminLoginSubmit");
   const txt = document.getElementById("adminLoginSubmitText");
+  const googleBtn = document.getElementById("adminGoogleLoginBtn");
   if (!btn || !txt) return;
   btn.disabled = loading;
+  if (googleBtn) googleBtn.disabled = loading;
   txt.textContent = loading ? "Entrando..." : "Entrar";
+}
+
+function setAdminSessionChecking(checking) {
+  const spinner = document.getElementById("adminSessionSpinner");
+  const emailBtn = document.getElementById("adminLoginSubmit");
+  const googleBtn = document.getElementById("adminGoogleLoginBtn");
+  if (spinner) spinner.style.display = checking ? "flex" : "none";
+  if (emailBtn) emailBtn.disabled = checking;
+  if (googleBtn) googleBtn.disabled = checking;
+}
+
+function googleRedirectTo() {
+  return window.location.hostname === "localhost"
+    ? `${window.location.origin}/admin/dashboard`
+    : `${window.location.origin}/lanches-daniel/admin/dashboard`;
 }
 
 function renderAuthLayout(route) {
@@ -530,6 +558,7 @@ function renderAuthLayout(route) {
   if (authShell) authShell.style.display = isLoginRoute ? "grid" : "none";
   if (adminRoot) adminRoot.style.display = isLoginRoute ? "none" : adminRoot.style.display;
   if (publicRoot && isLoginRoute) publicRoot.style.display = "none";
+  if (isLoginRoute) setAdminSessionChecking(!!state.authChecking);
 }
 
 function applyRoute() {
@@ -1458,6 +1487,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("adminForgotPasswordLink")?.addEventListener("click", () => {
     resetPasswordFor("adminEmailLogin");
+  });
+
+  document.getElementById("adminGoogleLoginBtn")?.addEventListener("click", async () => {
+    setAdminLoginError("");
+    setAdminLoginLoading(true);
+
+    try {
+      if (!usingSupabase()) {
+        state.loggedIn = true;
+        state.profile = { role: "owner" };
+        saveLocalSession();
+        navigateTo("/admin/dashboard");
+        return;
+      }
+
+      const { error } = await supabaseDb.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: googleRedirectTo()
+        }
+      });
+
+      if (error) {
+        console.error(error);
+        setAdminLoginError("Não foi possível entrar com Google. Tente novamente.");
+      }
+    } catch (error) {
+      console.error(error);
+      setAdminLoginError("Falha ao iniciar login com Google. Tente novamente.");
+    } finally {
+      setAdminLoginLoading(false);
+    }
   });
 
   document.getElementById("adminLoginForm")?.addEventListener("submit", async (event) => {
