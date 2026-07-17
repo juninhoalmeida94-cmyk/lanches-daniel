@@ -235,11 +235,17 @@ async function initSupabaseBackend() {
   const { data: sessionData } = await supabaseDb.auth.getSession();
   state.authUser = sessionData.session?.user || null;
   if (state.authUser) await loadProfile();
+  // applyRoute() may have already run (from DOMContentLoaded) before this
+  // session check finished, and could have wrongly bounced an authenticated
+  // user to /admin/login. Re-run it now that state.authUser/state.profile
+  // reflect the real session, so the correct view is shown.
+  applyRoute();
   supabaseDb.auth.onAuthStateChange(async (_event, session) => {
     state.authUser = session?.user || null;
     state.profile = null;
     if (state.authUser) await loadProfile();
     await refreshFromSupabase();
+    applyRoute();
   });
   await refreshFromSupabase();
   subscribeRealtime();
