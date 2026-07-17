@@ -246,7 +246,46 @@ async function initSupabaseBackend() {
   isBootstrappingAuth = true;
 
   try {
-    supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseDb = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          flowType: "implicit"
+        }
+      }
+    );
+
+    // Recupera manualmente a sessão do retorno do Google.
+    if (window.location.hash.includes("access_token=")) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        const { data, error } = await supabaseDb.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+
+        if (error) {
+          console.error("Erro ao recuperar sessão OAuth:", error);
+          setAdminLoginError("Não foi possível concluir o login com Google.");
+        } else {
+          state.authUser = data.session?.user || null;
+          state.loggedIn = !!state.authUser;
+
+          history.replaceState(
+            {},
+            document.title,
+            window.location.pathname + window.location.search
+          );
+        }
+      }
+    }
 
     supabaseDb.auth.onAuthStateChange(async (event, session) => {
       if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
