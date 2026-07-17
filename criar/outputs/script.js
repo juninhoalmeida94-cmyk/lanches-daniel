@@ -1408,7 +1408,7 @@ function generateAiProduct() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    const swUrl = new URL("sw.js", window.location.href).toString();
+    const swUrl = new URL("sw.js", document.baseURI).toString();
     navigator.serviceWorker.register(swUrl);
   }
 

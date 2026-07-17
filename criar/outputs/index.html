@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Daniel Lanches OS</title>
   <meta name="theme-color" content="#1A1A1A" />
+  <script>
+    (function configureAssetBase() {
+      const repoBase = "/lanches-daniel/";
+      const base = document.createElement("base");
+      base.href = window.location.pathname.startsWith(repoBase) ? repoBase : "/";
+      document.head.appendChild(base);
+    })();
+  </script>
 
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="./daniel-lanches-icon-192.png" />
