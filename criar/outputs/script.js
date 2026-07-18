@@ -308,15 +308,44 @@ async function initSupabaseBackend() {
 
           await loadProfile();
 
+          const onAdminLoginRoute = normalizeRoute(window.location.pathname) === "/admin/login";
+
           if (!isStaffRole(state.profile?.role)) {
-            setAdminLoginError("Esta conta não possui permissão administrativa.");
-            applyRoute();
+            if (onAdminLoginRoute) {
+              // Fluxo do admin inalterado: conta sem permissão de equipe tentando entrar em /admin/login.
+              setAdminLoginError("Esta conta não possui permissão administrativa.");
+              applyRoute();
+              return;
+            }
+
+            // Fluxo do cliente (ex.: login com Google feito a partir do cardápio público).
+            // Verifica primeiro pelo auth.uid (loadProfile já rodou acima); só cria
+            // perfil novo via upsert se realmente não existir um ainda.
+            if (!state.profile) {
+              const googleUser = state.authUser.user_metadata || {};
+              state.customer = {
+                name: googleUser.full_name || googleUser.name || state.customer.name,
+                phone: state.customer.phone,
+                address: state.customer.address
+              };
+              try {
+                await upsertCustomerProfile();
+              } catch (profileError) {
+                console.error(profileError);
+              }
+            }
+
+            await refreshFromSupabase();
+            saveLocalSession();
+            closeModal("loginModal");
+            // Carrinho nunca é tocado aqui, então segue intacto.
+            navigateTo("/cardapio?tab=profile");
             return;
           }
 
           await refreshFromSupabase();
 
-          if (normalizeRoute(window.location.pathname) === "/admin/login") {
+          if (onAdminLoginRoute) {
             history.replaceState({}, "", routeToUrl("/admin/dashboard"));
           }
 
@@ -381,7 +410,9 @@ async function loadProfile() {
       state.customer = {
         name: data.full_name || state.customer.name,
         phone: data.phone || state.customer.phone,
-        address: state.customer.address
+        address: state.customer.address,
+        email: data.email || state.authUser.email || state.customer.email || "",
+        avatarUrl: data.avatar_url || state.customer.avatarUrl || ""
       };
       saveLocalSession();
     }
@@ -393,11 +424,14 @@ async function loadProfile() {
 
 async function upsertCustomerProfile() {
   if (!usingSupabase() || !state.authUser) return;
+  const googleMeta = state.authUser.user_metadata || {};
   const payload = {
-    id: state.authUser.id,
+    id: state.authUser.id, // sempre pelo auth.uid — upsert evita duplicidade
     full_name: state.customer.name,
     phone: state.customer.phone,
-    role: "customer"
+    role: "customer",
+    email: state.authUser.email || null,
+    avatar_url: googleMeta.avatar_url || googleMeta.picture || null
   };
   const { error } = await supabaseDb.from("profiles").upsert(payload);
   if (error) throw error;
@@ -657,6 +691,11 @@ function googleRedirectTo() {
   return `${window.location.origin}${BASE_PATH}/admin/login`;
 }
 
+function customerGoogleRedirectTo() {
+  // Cliente deve voltar para a mesma página do cardápio em que estava, não para o admin.
+  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+}
+
 function consumeOAuthErrorFromUrl() {
   const url = new URL(window.location.href);
   const error = url.searchParams.get("error");
@@ -747,6 +786,41 @@ function openModal(id) {
   document.getElementById(id).classList.add("show");
   document.getElementById(id).setAttribute("aria-hidden", "false");
   iconRefresh();
+}
+
+function setLoginModalAuthFieldsVisible(visible) {
+  const emailField = document.getElementById("loginEmailField");
+  const passwordField = document.getElementById("loginPasswordField");
+  const googleBtn = document.getElementById("loginGoogleBtn");
+  const divider = document.getElementById("loginGoogleDivider");
+  const display = visible ? "" : "none";
+  if (emailField) emailField.style.display = display;
+  if (passwordField) passwordField.style.display = display;
+  if (googleBtn) googleBtn.style.display = display;
+  if (divider) divider.style.display = display;
+}
+
+function openCustomerLoginModal() {
+  // Cliente ainda não autenticado: mostra e-mail/senha + Google, campos em branco.
+  setLoginModalAuthFieldsVisible(true);
+  ["loginEmail", "loginPassword", "loginName", "loginPhone", "loginAddress"].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = "";
+  });
+  openModal("loginModal");
+}
+
+function openCustomerProfileEditModal() {
+  // Cliente já autenticado (e-mail/senha ou Google): esconde e-mail/senha/Google
+  // e preenche os campos com os dados atuais para edição.
+  setLoginModalAuthFieldsVisible(false);
+  const nameInput = document.getElementById("loginName");
+  const phoneInput = document.getElementById("loginPhone");
+  const addressInput = document.getElementById("loginAddress");
+  if (nameInput) nameInput.value = state.customer.name || "";
+  if (phoneInput) phoneInput.value = state.customer.phone || "";
+  if (addressInput) addressInput.value = state.customer.address || "";
+  openModal("loginModal");
 }
 
 function closeModal(id) {
@@ -1121,9 +1195,21 @@ function renderCustomerProfile() {
   const name = document.getElementById("customerProfileName");
   const phone = document.getElementById("customerProfilePhone");
   const address = document.getElementById("customerProfileAddress");
+  const email = document.getElementById("customerProfileEmail");
+  const avatar = document.getElementById("customerProfileAvatar");
   if (name) name.textContent = state.customer.name;
   if (phone) phone.textContent = state.customer.phone;
   if (address) address.textContent = state.customer.address;
+  if (email) email.textContent = state.customer.email || "-";
+  if (avatar) {
+    if (state.customer.avatarUrl) {
+      avatar.src = state.customer.avatarUrl;
+      avatar.style.display = "";
+    } else {
+      avatar.removeAttribute("src");
+      avatar.style.display = "none";
+    }
+  }
 }
 
 function renderAll() {
@@ -1231,7 +1317,7 @@ function finishOrderFlow() {
     return;
   }
   if (!state.loggedIn) {
-    openModal("loginModal");
+    openCustomerLoginModal();
     return;
   }
   renderCheckout();
@@ -1240,10 +1326,29 @@ function finishOrderFlow() {
 
 async function confirmLogin() {
   state.customer = {
-    name: document.getElementById("loginName").value.trim() || "Cliente Daniel",
-    phone: document.getElementById("loginPhone").value.trim() || "(11) 90000-2026",
-    address: document.getElementById("loginAddress").value.trim() || "Endereço não informado"
+    name: document.getElementById("loginName").value.trim() || state.customer.name || "Cliente Daniel",
+    phone: document.getElementById("loginPhone").value.trim() || state.customer.phone || "(11) 90000-2026",
+    address: document.getElementById("loginAddress").value.trim() || state.customer.address || "Endereço não informado"
   };
+
+  if (usingSupabase() && state.authUser) {
+    // Usuário já autenticado (e-mail/senha ou Google): o modal está sendo usado
+    // para editar nome/telefone/endereço, não para logar de novo.
+    try {
+      await upsertCustomerProfile();
+    } catch (profileError) {
+      console.error(profileError);
+      showToast("Não foi possível salvar perfil");
+      return;
+    }
+    state.loggedIn = true;
+    saveLocalSession();
+    renderAll();
+    closeModal("loginModal");
+    showToast("Dados atualizados");
+    return;
+  }
+
   if (usingSupabase()) {
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value.trim();
@@ -1360,7 +1465,7 @@ function adminLoginFlow() {
 async function createOrder() {
   if (usingSupabase() && !state.authUser) {
     showToast("Entre para enviar o pedido");
-    openModal("loginModal");
+    openCustomerLoginModal();
     return;
   }
   if (cartSubtotal() < minimumOrder) {
@@ -1756,6 +1861,31 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("newOrderBtn")?.addEventListener("click", simulateNewOrder);
   document.getElementById("loginConfirmBtn")?.addEventListener("click", confirmLogin);
+  document.getElementById("loginGoogleBtn")?.addEventListener("click", async () => {
+    if (!usingSupabase()) {
+      showToast("Login com Google exige Supabase configurado");
+      return;
+    }
+    const btn = document.getElementById("loginGoogleBtn");
+    if (btn) btn.disabled = true;
+    try {
+      const { error } = await supabaseDb.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: customerGoogleRedirectTo()
+        }
+      });
+      if (error) {
+        console.error(error);
+        showToast("Não foi possível iniciar login com Google.");
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Falha ao iniciar login com Google.");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
   document.getElementById("loginResetPasswordBtn")?.addEventListener("click", () => resetPasswordFor("loginEmail"));
   const adminLoginBtn = document.getElementById("adminLoginBtn");
   if (adminLoginBtn) adminLoginBtn.addEventListener("click", adminLoginFlow);
@@ -1802,7 +1932,8 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (target.id === "publicProfileEditBtn") {
-      openModal("loginModal");
+      if (state.loggedIn) openCustomerProfileEditModal();
+      else openCustomerLoginModal();
       return;
     }
 
@@ -1818,7 +1949,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (target.dataset.delete) deleteOrder(target.dataset.delete);
     if (target.dataset.print) printOrder(target.dataset.print);
     if (target.dataset.whatsapp) showToast("Mensagem do WhatsApp preparada");
-    if (target.id === "myOrdersLoginBtn") openModal("loginModal");
+    if (target.id === "myOrdersLoginBtn") openCustomerLoginModal();
   });
 
   document.body.addEventListener("change", event => {

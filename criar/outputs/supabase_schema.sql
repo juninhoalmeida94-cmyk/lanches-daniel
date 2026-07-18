@@ -11,6 +11,10 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Login com Google (cliente): guarda e-mail e avatar vindos do OAuth.
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists avatar_url text;
+
 create table if not exists public.store_settings (
   id text primary key default 'default',
   store_open boolean not null default true,

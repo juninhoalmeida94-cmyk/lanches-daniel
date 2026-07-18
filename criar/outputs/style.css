@@ -610,6 +610,13 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 .public-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
 .profile-card { display: grid; gap: 10px; }
 .profile-card p { margin-bottom: 0; }
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(0,0,0,.08);
+}
 .store-layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
 .product-grid { display: grid; gap: 14px; }
 .customer-bottom-nav {
@@ -1125,6 +1132,25 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
   font-weight: 850;
   cursor: pointer;
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 4px 0;
+  color: #9aa0a6;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(0,0,0,.12);
 }
 .google-login-btn:hover {
   transform: translateY(-1px);

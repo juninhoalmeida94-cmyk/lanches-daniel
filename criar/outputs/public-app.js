@@ -135,7 +135,9 @@
             <section class="public-panel">
               <div class="panel-head"><div><span class="eyebrow">Perfil</span><h2>Dados do cliente</h2></div></div>
               <div class="profile-card">
+                <img class="profile-avatar" id="customerProfileAvatar" alt="Foto do perfil" style="display:none;" />
                 <p>Nome: <strong id="customerProfileName">Cliente Daniel</strong></p>
+                <p>E-mail: <strong id="customerProfileEmail">-</strong></p>
                 <p>Telefone: <strong id="customerProfilePhone">(11) 90000-2026</strong></p>
                 <p>Endereço: <strong id="customerProfileAddress">Rua das Flores, 128</strong></p>
                 <button class="primary-btn" id="publicProfileEditBtn"><i data-lucide="user-round-plus"></i><span>Atualizar dados</span></button>
