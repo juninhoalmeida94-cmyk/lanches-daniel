@@ -490,16 +490,24 @@
       <section class="modal-card">
         <button class="icon-btn modal-close" data-close-modal="loginModal" aria-label="Fechar"><i data-lucide="x"></i></button>
         <span class="eyebrow">Cliente</span>
-        <h2>Entrar ou cadastrar</h2>
-        <p>Para finalizar o pedido, informe seus dados. A sessão fica ativa para acompanhar o status em tempo real.</p>
+        <h2 id="loginModalTitle">Entrar na sua conta</h2>
+        <p id="loginModalDescription">Use seu e-mail e senha para continuar.</p>
         <div class="form-grid">
-          <label id="loginEmailField">E-mail<input id="loginEmail" type="email" placeholder="cliente@daniellanches.com" /></label>
-          <label id="loginPasswordField">Senha<input id="loginPassword" type="password" placeholder="Sua senha" /></label>
-          <label>Nome<input id="loginName" placeholder="Seu nome" /></label>
-          <label>Telefone<input id="loginPhone" placeholder="(11) 99999-9999" /></label>
-          <label class="full-field">Endereço salvo<input id="loginAddress" placeholder="Seu endereço" /></label>
+          <label id="loginEmailField" for="loginEmail">E-mail<input id="loginEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" /></label>
+          <label id="loginPasswordField" for="loginPassword">Senha<input id="loginPassword" type="password" placeholder="Mínimo de 6 caracteres" autocomplete="current-password" /></label>
+          <label id="loginPasswordConfirmField" for="loginPasswordConfirm">Confirmar senha<input id="loginPasswordConfirm" type="password" placeholder="Repita a nova senha" autocomplete="new-password" /></label>
+          <label id="loginNameField" for="loginName">Nome<input id="loginName" autocomplete="name" placeholder="Seu nome completo" /></label>
+          <label id="loginPhoneField" for="loginPhone">Telefone<input id="loginPhone" autocomplete="tel" inputmode="tel" placeholder="(11) 99999-9999" /></label>
+          <div class="form-grid full-field" id="loginAddressFields">
+            <label for="loginAddress">Endereço<input id="loginAddress" autocomplete="street-address" placeholder="Rua ou avenida" /></label>
+            <label for="loginAddressNumber">Número<input id="loginAddressNumber" inputmode="numeric" placeholder="128" /></label>
+            <label for="loginNeighborhood">Bairro<input id="loginNeighborhood" placeholder="Seu bairro" /></label>
+            <label for="loginComplement">Complemento<input id="loginComplement" placeholder="Apartamento, bloco..." /></label>
+            <label class="full-field" for="loginReference">Referência<input id="loginReference" placeholder="Próximo à praça" /></label>
+          </div>
         </div>
-        <button class="primary-btn full" id="loginConfirmBtn"><i data-lucide="log-in"></i><span>Continuar</span></button>
+        <div class="auth-error" id="customerAuthError" role="alert" aria-live="polite"></div>
+        <button class="primary-btn full" id="loginConfirmBtn"><i data-lucide="log-in"></i><span id="loginConfirmText">Entrar</span></button>
 
         <div class="auth-divider" id="loginGoogleDivider"><span>ou</span></div>
 
@@ -514,6 +522,7 @@
         </button>
 
         <button class="ghost-btn full" id="loginResetPasswordBtn" type="button"><i data-lucide="key-round"></i><span>Recuperar senha</span></button>
+        <button class="customer-auth-link" id="loginModeSwitchBtn" type="button">Criar uma conta</button>
       </section>
     </div>
     <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">

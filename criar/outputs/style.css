@@ -608,14 +608,62 @@ th { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spac
 .offer-card .secondary-btn { width: 100%; }
 .public-shell-body { padding: 0 20px 92px; }
 .public-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
-.profile-card { display: grid; gap: 10px; }
-.profile-card p { margin-bottom: 0; }
+.profile-card { display: grid; gap: 12px; }
+.profile-card p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--text); }
+.profile-card p strong { display: block; margin-top: 3px; color: var(--black); }
 .profile-avatar {
   width: 64px;
   height: 64px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid rgba(0,0,0,.08);
+}
+.customer-auth-gate,
+.customer-confirmation {
+  width: min(460px, 100%);
+  margin: 16px auto 4px;
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+.customer-auth-gate h2,
+.customer-confirmation h2 { margin: 0; font-size: 22px; }
+.customer-auth-gate p,
+.customer-confirmation p { margin: 0 0 8px; color: var(--text); line-height: 1.55; }
+.customer-auth-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 2px;
+  border-radius: 16px;
+  color: var(--black);
+  background: var(--yellow);
+}
+.customer-auth-icon svg { width: 24px; height: 24px; }
+.customer-auth-link {
+  width: fit-content;
+  min-height: 36px;
+  justify-self: center;
+  padding: 6px 10px;
+  color: #52525b;
+  background: transparent;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.customer-auth-link:hover { color: var(--black); }
+.customer-auth-gate .primary-btn span,
+.customer-auth-gate .secondary-btn span,
+.customer-confirmation .primary-btn span,
+.profile-card .primary-btn span,
+.profile-card .secondary-btn span,
+#loginModal .primary-btn span,
+#loginModal .ghost-btn span { display: inline; }
+#loginAddressFields { margin: 0; }
+#customerAuthError { min-height: 20px; margin: 4px 0; }
+@media (max-width: 780px) {
+  .public-shell { overflow-x: clip; }
 }
 .store-layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
 .product-grid { display: grid; gap: 14px; }

@@ -23,6 +23,9 @@ let realtimeChannel = null;
 let isVerifyingSession = true;
 let isBootstrappingAuth = false;
 let isLoadingProfile = false;
+let customerAuthMode = "login";
+let customerAuthReturnToCheckout = false;
+let pendingConfirmationEmail = "";
 
 function usingSupabase() {
   return SUPABASE_ENABLED && !!supabaseDb;
@@ -112,21 +115,38 @@ if (!Array.isArray(state.favorites)) state.favorites = [];
 if (!state.sortBy) state.sortBy = "default";
 state.backend = SUPABASE_ENABLED ? "Supabase" : "Local";
 state.authUser = null;
-state.profile = state.profile || null;
+state.profile = null;
 state.editingProductId = state.editingProductId || products[0]?.id || null;
 
+function emptyCustomer() {
+  return {
+    name: "",
+    email: "",
+    phone: "",
+    avatarUrl: "",
+    address: "",
+    addressNumber: "",
+    neighborhood: "",
+    complement: "",
+    reference: ""
+  };
+}
+
 function loadState() {
+  let stored = {};
   try {
-    const stored = localStorage.getItem("danielLanchesRealtime");
-    if (stored) return JSON.parse(stored);
+    stored = JSON.parse(localStorage.getItem("danielLanchesRealtime") || "{}");
   } catch (error) {
     localStorage.removeItem("danielLanchesRealtime");
   }
+
+  // Conta, perfil e pedidos nunca são restaurados do navegador. O Supabase Auth
+  // e as políticas RLS são as únicas fontes de identidade do cliente.
   return {
     storeOpen: true,
     loggedIn: false,
-    customer: { name: "Mariana Souza", phone: "(11) 97777-2201", address: "Rua das Flores, 128" },
-    cart: [],
+    customer: emptyCustomer(),
+    cart: Array.isArray(stored.cart) ? stored.cart : [],
     categoryFilter: "Todos",
     favorites: [],
     sortBy: "default",
@@ -137,26 +157,23 @@ function loadState() {
 }
 
 function saveState() {
-  if (!usingSupabase()) localStorage.setItem("danielLanchesRealtime", JSON.stringify(state));
+  saveLocalSession();
   window.dispatchEvent(new CustomEvent("daniel:state-change"));
 }
 
 function saveLocalSession() {
   const localOnly = {
-    storeOpen: state.storeOpen,
-    loggedIn: state.loggedIn,
-    customer: state.customer,
-    cart: state.cart,
-    categoryFilter: state.categoryFilter,
-    favorites: state.favorites,
-    sortBy: state.sortBy,
-    orders: state.orders,
-    nextOrderNumber: state.nextOrderNumber,
-    sales7: state.sales7,
-    backend: state.backend,
-    profile: state.profile
+    cart: state.cart
   };
   localStorage.setItem("danielLanchesRealtime", JSON.stringify(localOnly));
+}
+
+function clearCustomerAccountState() {
+  state.authUser = null;
+  state.profile = null;
+  state.loggedIn = false;
+  state.customer = emptyCustomer();
+  if (usingSupabase()) state.orders = [];
 }
 
 function dbRowToOrder(row) {
@@ -181,7 +198,7 @@ function dbRowToOrder(row) {
 
 function orderToDbPayload(order) {
   return {
-    user_id: state.authUser?.id,
+    user_id: state.authUser ? state.authUser.id : null,
     status: order.status,
     customer_name: order.customer,
     phone: order.phone,
@@ -240,6 +257,74 @@ function recomputeSales7() {
   });
 }
 
+function hasOAuthCallback() {
+  const url = new URL(window.location.href);
+  return url.searchParams.has("code") || window.location.hash.includes("access_token=");
+}
+
+function cleanOAuthCallbackUrl() {
+  const url = new URL(window.location.href);
+  ["code", "error", "error_code", "error_description"].forEach(key => url.searchParams.delete(key));
+  url.hash = "";
+  history.replaceState({}, document.title, url.pathname + url.search);
+}
+
+async function ensureCustomerProfile() {
+  if (!usingSupabase() || !state.authUser || state.profile) return state.profile;
+  const metadata = state.authUser.user_metadata || {};
+  state.customer = {
+    ...emptyCustomer(),
+    name: metadata.full_name || metadata.name || "",
+    email: state.authUser.email || "",
+    phone: metadata.phone || "",
+    avatarUrl: metadata.avatar_url || metadata.picture || ""
+  };
+  await upsertCustomerProfile();
+  return state.profile;
+}
+
+async function handleAuthStateChange(event, session) {
+  const previousUserId = state.authUser?.id || null;
+  state.authUser = session?.user || null;
+  state.loggedIn = !!state.authUser;
+
+  if (!state.authUser) {
+    clearCustomerAccountState();
+    renderAll();
+    applyRoute();
+    return;
+  }
+  pendingConfirmationEmail = "";
+
+  if (event === "TOKEN_REFRESHED" && previousUserId === state.authUser.id && state.profile) {
+    return;
+  }
+
+  state.profile = null;
+  await loadProfile();
+  const onAdminRoute = normalizeRoute(window.location.pathname).startsWith("/admin");
+
+  if (!onAdminRoute && !state.profile) await ensureCustomerProfile();
+
+  if (onAdminRoute) {
+    if (!isStaffRole(state.profile?.role)) {
+      setAdminLoginError("Esta conta não possui permissão administrativa.");
+      applyRoute();
+      return;
+    }
+    if (normalizeRoute(window.location.pathname) === "/admin/login") {
+      history.replaceState({}, "", routeToUrl("/admin/dashboard"));
+    }
+  }
+
+  await refreshFromSupabase();
+  renderAll();
+  applyRoute();
+  if (event === "PASSWORD_RECOVERY" && !onAdminRoute) {
+    openCustomerLoginModal("reset");
+  }
+}
+
 async function initSupabaseBackend() {
   if (!SUPABASE_ENABLED || !window.supabase) {
     state.backend = "Local";
@@ -251,137 +336,63 @@ async function initSupabaseBackend() {
 
   if (isBootstrappingAuth) return;
   isBootstrappingAuth = true;
+  const returningFromOAuth = hasOAuthCallback();
 
   try {
-    supabaseDb = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-          flowType: "pkce"
-        }
+    supabaseDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: "pkce"
       }
-    );
+    });
 
-    const {
-      data: { session },
-      error: sessionError
-    } = await supabaseDb.auth.getSession();
+    supabaseDb.auth.onAuthStateChange((event, session) => {
+      if (isBootstrappingAuth && event === "INITIAL_SESSION") return;
+      setTimeout(() => {
+        handleAuthStateChange(event, session).catch(error => {
+          console.error("Auth state error:", error);
+          setAdminLoginError("Não foi possível atualizar a sessão.");
+        });
+      }, 0);
+    });
 
+    const { data: { session }, error: sessionError } = await supabaseDb.auth.getSession();
     if (sessionError) throw sessionError;
 
     state.authUser = session?.user || null;
-    state.profile = null;
     state.loggedIn = !!state.authUser;
+    state.profile = null;
 
     if (state.authUser) {
+      pendingConfirmationEmail = "";
       await loadProfile();
+      const onAdminRoute = normalizeRoute(window.location.pathname).startsWith("/admin");
+      if (!onAdminRoute && !state.profile) await ensureCustomerProfile();
+    } else {
+      clearCustomerAccountState();
     }
 
-    await refreshFromSupabase();
-    subscribeRealtime();
+    if (returningFromOAuth) cleanOAuthCallbackUrl();
 
-    if (
-      state.authUser &&
-      isStaffRole(state.profile?.role) &&
-      normalizeRoute(window.location.pathname) === "/admin/login"
-    ) {
+    const route = normalizeRoute(window.location.pathname);
+    if (state.authUser && route === "/admin/login" && isStaffRole(state.profile?.role)) {
       history.replaceState({}, "", routeToUrl("/admin/dashboard"));
+    } else if (state.authUser && returningFromOAuth && !route.startsWith("/admin")) {
+      history.replaceState({}, "", routeToUrl("/cardapio?tab=profile"));
     }
 
-    supabaseDb.auth.onAuthStateChange((event, newSession) => {
-      setTimeout(async () => {
-        try {
-          console.log("Auth event:", event);
-
-          state.authUser = newSession?.user || null;
-          state.loggedIn = !!state.authUser;
-
-          if (!state.authUser) {
-            state.profile = null;
-            applyRoute();
-            return;
-          }
-
-          await loadProfile();
-
-          const onAdminLoginRoute = normalizeRoute(window.location.pathname) === "/admin/login";
-
-          if (!isStaffRole(state.profile?.role)) {
-            if (onAdminLoginRoute) {
-              // Fluxo do admin inalterado: conta sem permissão de equipe tentando entrar em /admin/login.
-              setAdminLoginError("Esta conta não possui permissão administrativa.");
-              applyRoute();
-              return;
-            }
-
-            // Fluxo do cliente (ex.: login com Google feito a partir do cardápio público).
-            // Verifica primeiro pelo auth.uid (loadProfile já rodou acima); só cria
-            // perfil novo via upsert se realmente não existir um ainda.
-            if (!state.profile) {
-              const googleUser = state.authUser.user_metadata || {};
-              state.customer = {
-                name: googleUser.full_name || googleUser.name || state.customer.name,
-                phone: state.customer.phone,
-                address: state.customer.address
-              };
-              try {
-                await upsertCustomerProfile();
-              } catch (profileError) {
-                console.error(profileError);
-              }
-            }
-
-            await refreshFromSupabase();
-            saveLocalSession();
-            closeModal("loginModal");
-            // Carrinho nunca é tocado aqui, então segue intacto.
-            navigateTo("/cardapio?tab=profile");
-            return;
-          }
-
-          await refreshFromSupabase();
-
-          if (onAdminLoginRoute) {
-            history.replaceState({}, "", routeToUrl("/admin/dashboard"));
-          }
-
-          applyRoute();
-        } catch (error) {
-          console.error("Auth state error:", error);
-        }
-      }, 0);
-    });
+    setVerifyingSession(false, "");
+    applyRoute();
+    refreshFromSupabase().catch(error => console.error("Data refresh error:", error));
+    subscribeRealtime();
   } catch (error) {
     console.error("initSupabaseBackend error:", error);
-    state.authUser = null;
-    state.profile = null;
-    state.loggedIn = false;
+    clearCustomerAccountState();
   } finally {
     isBootstrappingAuth = false;
     setVerifyingSession(false, "");
-
-    if (window.location.hash.includes("access_token=")) {
-      history.replaceState(
-        {},
-        document.title,
-        window.location.pathname + window.location.search
-      );
-    }
-
-    if (new URL(window.location.href).searchParams.has("code")) {
-      const cleanUrl = new URL(window.location.href);
-      cleanUrl.searchParams.delete("code");
-      history.replaceState(
-        {},
-        document.title,
-        cleanUrl.pathname + cleanUrl.search + cleanUrl.hash
-      );
-    }
-
     applyRoute();
     renderBackendNotice();
   }
@@ -408,13 +419,16 @@ async function loadProfile() {
     state.loggedIn = !!state.authUser;
     if (data) {
       state.customer = {
-        name: data.full_name || state.customer.name,
-        phone: data.phone || state.customer.phone,
-        address: state.customer.address,
-        email: data.email || state.authUser.email || state.customer.email || "",
-        avatarUrl: data.avatar_url || state.customer.avatarUrl || ""
+        name: data.full_name || "",
+        phone: data.phone || "",
+        address: data.address || "",
+        addressNumber: data.address_number || "",
+        neighborhood: data.neighborhood || "",
+        complement: data.complement || "",
+        reference: data.reference || "",
+        email: data.email || state.authUser.email || "",
+        avatarUrl: data.avatar_url || ""
       };
-      saveLocalSession();
     }
     return data;
   } finally {
@@ -426,14 +440,18 @@ async function upsertCustomerProfile() {
   if (!usingSupabase() || !state.authUser) return;
   const googleMeta = state.authUser.user_metadata || {};
   const payload = {
-    id: state.authUser.id, // sempre pelo auth.uid — upsert evita duplicidade
-    full_name: state.customer.name,
-    phone: state.customer.phone,
-    role: "customer",
+    id: state.authUser.id,
+    full_name: state.customer.name || googleMeta.full_name || googleMeta.name || "",
+    phone: state.customer.phone || googleMeta.phone || "",
     email: state.authUser.email || null,
-    avatar_url: googleMeta.avatar_url || googleMeta.picture || null
+    avatar_url: state.customer.avatarUrl || googleMeta.avatar_url || googleMeta.picture || null,
+    address: state.customer.address || "",
+    address_number: state.customer.addressNumber || "",
+    neighborhood: state.customer.neighborhood || "",
+    complement: state.customer.complement || "",
+    reference: state.customer.reference || ""
   };
-  const { error } = await supabaseDb.from("profiles").upsert(payload);
+  const { error } = await supabaseDb.from("profiles").upsert(payload, { onConflict: "id" });
   if (error) throw error;
   await loadProfile();
 }
@@ -459,10 +477,12 @@ async function refreshFromSupabase() {
   if (dbProducts?.length) products = dbProducts.map(dbProductToProduct);
 
   if (state.authUser) {
-    const { data: orders, error: ordersError } = await supabaseDb
+    let ordersQuery = supabaseDb
       .from("orders")
       .select("*")
       .order("created_at", { ascending: false });
+    if (!isStaffRole(state.profile?.role)) ordersQuery = ordersQuery.eq("user_id", state.authUser.id);
+    const { data: orders, error: ordersError } = await ordersQuery;
     if (ordersError) {
       console.error(ordersError);
       showToast("Entre novamente para ver pedidos");
@@ -692,8 +712,10 @@ function googleRedirectTo() {
 }
 
 function customerGoogleRedirectTo() {
-  // Cliente deve voltar para a mesma página do cardápio em que estava, não para o admin.
-  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  const localHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  return localHost
+    ? `${window.location.origin}/index.html?tab=profile`
+    : `${window.location.origin}${routeToUrl("/cardapio?tab=profile")}`;
 }
 
 function consumeOAuthErrorFromUrl() {
@@ -703,11 +725,11 @@ function consumeOAuthErrorFromUrl() {
 
   if (!error) return;
 
-  if (error === "invalid_request" && desc.includes("OAuth state not found")) {
-    setAdminLoginError("Sessão OAuth expirada. Clique em “Continuar com Google” novamente.");
-  } else {
-    setAdminLoginError(`Falha no login social: ${error}`);
-  }
+  const message = error === "invalid_request" && desc.includes("OAuth state not found")
+    ? "Sessão OAuth expirada. Clique em “Continuar com Google” novamente."
+    : `Falha no login social: ${error}`;
+  if (normalizeRoute(window.location.pathname).startsWith("/admin")) setAdminLoginError(message);
+  else showToast(message);
 
   url.searchParams.delete("error");
   url.searchParams.delete("error_code");
@@ -788,39 +810,106 @@ function openModal(id) {
   iconRefresh();
 }
 
-function setLoginModalAuthFieldsVisible(visible) {
-  const emailField = document.getElementById("loginEmailField");
-  const passwordField = document.getElementById("loginPasswordField");
-  const googleBtn = document.getElementById("loginGoogleBtn");
-  const divider = document.getElementById("loginGoogleDivider");
-  const display = visible ? "" : "none";
-  if (emailField) emailField.style.display = display;
-  if (passwordField) passwordField.style.display = display;
-  if (googleBtn) googleBtn.style.display = display;
-  if (divider) divider.style.display = display;
+function setCustomerAuthError(message = "") {
+  const error = document.getElementById("customerAuthError");
+  if (error) error.textContent = message;
 }
 
-function openCustomerLoginModal() {
-  // Cliente ainda não autenticado: mostra e-mail/senha + Google, campos em branco.
-  setLoginModalAuthFieldsVisible(true);
-  ["loginEmail", "loginPassword", "loginName", "loginPhone", "loginAddress"].forEach(id => {
+function setCustomerAuthLoading(loading) {
+  const submit = document.getElementById("loginConfirmBtn");
+  const submitText = document.getElementById("loginConfirmText");
+  const google = document.getElementById("loginGoogleBtn");
+  if (submit) submit.disabled = loading;
+  if (google) google.disabled = loading;
+  if (submitText) submitText.textContent = loading ? "Aguarde..." : ({
+    login: "Entrar",
+    signup: "Criar conta",
+    edit: "Salvar alterações",
+    forgot: "Enviar recuperação",
+    reset: "Salvar nova senha"
+  }[customerAuthMode] || "Continuar");
+}
+
+function setCustomerAuthMode(mode) {
+  customerAuthMode = mode;
+  const show = (id, visible) => {
+    const element = document.getElementById(id);
+    if (element) element.style.display = visible ? "" : "none";
+  };
+  const content = {
+    login: ["Entrar na sua conta", "Use seu e-mail e senha para continuar."],
+    signup: ["Criar sua conta", "Seus dados ficam protegidos e vinculados ao seu acesso."],
+    edit: ["Atualizar seus dados", "Mantenha telefone e endereço corretos para a entrega."],
+    forgot: ["Recuperar senha", "Enviaremos um link seguro para o seu e-mail."],
+    reset: ["Definir nova senha", "Crie uma nova senha para sua conta."]
+  }[mode];
+  const title = document.getElementById("loginModalTitle");
+  const description = document.getElementById("loginModalDescription");
+  const switchButton = document.getElementById("loginModeSwitchBtn");
+  if (title) title.textContent = content[0];
+  if (description) description.textContent = content[1];
+
+  show("loginEmailField", mode !== "edit" && mode !== "reset");
+  show("loginPasswordField", mode === "login" || mode === "signup" || mode === "reset");
+  show("loginPasswordConfirmField", mode === "reset");
+  show("loginNameField", mode === "signup" || mode === "edit");
+  show("loginPhoneField", mode === "signup" || mode === "edit");
+  show("loginAddressFields", mode === "edit");
+  show("loginGoogleDivider", mode === "login" || mode === "signup");
+  show("loginGoogleBtn", mode === "login" || mode === "signup");
+  show("loginResetPasswordBtn", mode === "login");
+  show("loginModeSwitchBtn", mode !== "edit" && mode !== "reset");
+
+  if (switchButton) {
+    switchButton.textContent = mode === "signup" ? "Já tenho uma conta" :
+      mode === "forgot" ? "Voltar para entrar" : "Criar uma conta";
+  }
+  setCustomerAuthError("");
+  setCustomerAuthLoading(false);
+}
+
+function clearCustomerAuthInputs() {
+  [
+    "loginEmail", "loginPassword", "loginPasswordConfirm", "loginName", "loginPhone", "loginAddress",
+    "loginAddressNumber", "loginNeighborhood", "loginComplement", "loginReference"
+  ].forEach(id => {
     const input = document.getElementById(id);
     if (input) input.value = "";
   });
+}
+
+function openCustomerLoginModal(mode = "login") {
+  clearCustomerAuthInputs();
+  setCustomerAuthMode(mode);
   openModal("loginModal");
 }
 
 function openCustomerProfileEditModal() {
-  // Cliente já autenticado (e-mail/senha ou Google): esconde e-mail/senha/Google
-  // e preenche os campos com os dados atuais para edição.
-  setLoginModalAuthFieldsVisible(false);
-  const nameInput = document.getElementById("loginName");
-  const phoneInput = document.getElementById("loginPhone");
-  const addressInput = document.getElementById("loginAddress");
-  if (nameInput) nameInput.value = state.customer.name || "";
-  if (phoneInput) phoneInput.value = state.customer.phone || "";
-  if (addressInput) addressInput.value = state.customer.address || "";
+  if (!state.authUser) {
+    openCustomerLoginModal();
+    return;
+  }
+  clearCustomerAuthInputs();
+  setCustomerAuthMode("edit");
+  const values = {
+    loginName: state.customer.name,
+    loginPhone: state.customer.phone,
+    loginAddress: state.customer.address,
+    loginAddressNumber: state.customer.addressNumber,
+    loginNeighborhood: state.customer.neighborhood,
+    loginComplement: state.customer.complement,
+    loginReference: state.customer.reference
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input) input.value = value || "";
+  });
   openModal("loginModal");
+}
+
+function formatCustomerAddress(customer = state.customer) {
+  const street = [customer.address, customer.addressNumber].filter(Boolean).join(", ");
+  return [street, customer.neighborhood, customer.complement].filter(Boolean).join(" - ");
 }
 
 function closeModal(id) {
@@ -1077,7 +1166,7 @@ function renderCheckout() {
     <span>Taxa de entrega<b>${money(fee)}</b></span>
     <span class="checkout-total">Total<b>${money(subtotal + fee)}</b></span>
   `;
-  document.getElementById("checkoutAddress").value = state.customer.address;
+  document.getElementById("checkoutAddress").value = formatCustomerAddress();
   document.getElementById("checkoutAddress").disabled = mode === "Retirada no local";
   document.getElementById("changeField").style.display = document.getElementById("checkoutPayment").value === "Dinheiro" ? "grid" : "none";
 }
@@ -1152,15 +1241,13 @@ function renderDashboard() {
 
 function renderMyOrders() {
   document.querySelectorAll("#myOrdersList").forEach(container => {
-    if (!state.loggedIn) {
-      container.innerHTML = `<section class="panel"><h2>Entre para ver seus pedidos</h2><p>Use o cadastro rápido para acompanhar seus pedidos em tempo real.</p><button class="primary-btn" id="myOrdersLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button></section>`;
+    if (!state.authUser) {
+      container.innerHTML = `<section class="panel"><h2>Entre para ver seus pedidos</h2><p>Seu histórico é protegido e carregado pela sua conta.</p><button class="primary-btn" id="myOrdersLoginBtn"><i data-lucide="log-in"></i><span>Entrar</span></button></section>`;
       return;
     }
 
-    // Com Supabase + RLS, state.orders já vem apenas do usuário autenticado (ou staff).
-    const mine = usingSupabase()
-      ? state.orders
-      : state.orders.filter(order => order.phone === state.customer.phone);
+    // RLS limita esta consulta ao user_id = auth.uid() para clientes.
+    const mine = state.orders;
 
     if (!mine.length) {
       container.innerHTML = `<section class="panel"><h2>Nenhum pedido ainda</h2><p>Quando você finalizar um pedido, ele aparece aqui automaticamente.</p></section>`;
@@ -1192,15 +1279,39 @@ function statusIcon(status) {
 }
 
 function renderCustomerProfile() {
+  const gate = document.getElementById("customerAuthGate");
+  const confirmation = document.getElementById("customerEmailConfirmation");
+  const profileContent = document.getElementById("customerProfileContent");
+  const confirmationEmail = document.getElementById("customerConfirmationEmail");
+  const authenticated = !!state.authUser;
+
+  if (gate) gate.style.display = !authenticated && !pendingConfirmationEmail ? "grid" : "none";
+  if (confirmation) confirmation.style.display = !authenticated && pendingConfirmationEmail ? "grid" : "none";
+  if (profileContent) profileContent.style.display = authenticated ? "grid" : "none";
+  if (confirmationEmail) confirmationEmail.textContent = pendingConfirmationEmail;
+
   const name = document.getElementById("customerProfileName");
   const phone = document.getElementById("customerProfilePhone");
   const address = document.getElementById("customerProfileAddress");
   const email = document.getElementById("customerProfileEmail");
+  const reference = document.getElementById("customerProfileReference");
   const avatar = document.getElementById("customerProfileAvatar");
-  if (name) name.textContent = state.customer.name;
-  if (phone) phone.textContent = state.customer.phone;
-  if (address) address.textContent = state.customer.address;
-  if (email) email.textContent = state.customer.email || "-";
+  if (!authenticated) {
+    if (avatar) {
+      avatar.removeAttribute("src");
+      avatar.style.display = "none";
+    }
+    return;
+  }
+
+  if (name) name.textContent = state.customer.name || "Cliente Daniel";
+  if (phone) phone.textContent = state.customer.phone || "Não informado";
+  if (address) address.textContent = formatCustomerAddress() || "Não informado";
+  if (email) email.textContent = state.customer.email || state.authUser.email || "Não informado";
+  if (reference) {
+    reference.textContent = state.customer.reference || "Não informado";
+    reference.closest("p").style.display = state.customer.reference ? "" : "none";
+  }
   if (avatar) {
     if (state.customer.avatarUrl) {
       avatar.src = state.customer.avatarUrl;
@@ -1316,8 +1427,16 @@ function finishOrderFlow() {
     showToast(`Pedido mínimo: ${money(minimumOrder)}`);
     return;
   }
-  if (!state.loggedIn) {
+  if (!state.authUser) {
+    customerAuthReturnToCheckout = true;
     openCustomerLoginModal();
+    return;
+  }
+  if (!state.profile || !state.customer.name || !state.customer.phone) {
+    customerAuthReturnToCheckout = true;
+    navigateTo("/cardapio?tab=profile");
+    openCustomerProfileEditModal();
+    showToast("Complete nome e telefone antes de finalizar.");
     return;
   }
   renderCheckout();
@@ -1325,83 +1444,170 @@ function finishOrderFlow() {
 }
 
 async function confirmLogin() {
-  state.customer = {
-    name: document.getElementById("loginName").value.trim() || state.customer.name || "Cliente Daniel",
-    phone: document.getElementById("loginPhone").value.trim() || state.customer.phone || "(11) 90000-2026",
-    address: document.getElementById("loginAddress").value.trim() || state.customer.address || "Endereço não informado"
-  };
-
-  if (usingSupabase() && state.authUser) {
-    // Usuário já autenticado (e-mail/senha ou Google): o modal está sendo usado
-    // para editar nome/telefone/endereço, não para logar de novo.
-    try {
-      await upsertCustomerProfile();
-    } catch (profileError) {
-      console.error(profileError);
-      showToast("Não foi possível salvar perfil");
-      return;
-    }
-    state.loggedIn = true;
-    saveLocalSession();
-    renderAll();
-    closeModal("loginModal");
-    showToast("Dados atualizados");
+  if (!usingSupabase()) {
+    setCustomerAuthError("A conta do cliente exige conexão com o Supabase.");
     return;
   }
 
-  if (usingSupabase()) {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
-    if (!email || !password) {
-      showToast("Informe e-mail e senha");
+  const value = id => document.getElementById(id)?.value.trim() || "";
+  const email = value("loginEmail");
+  const password = value("loginPassword");
+  setCustomerAuthError("");
+  setCustomerAuthLoading(true);
+
+  try {
+    if (customerAuthMode === "reset") {
+      const confirmation = value("loginPasswordConfirm");
+      if (password.length < 6) throw new Error("Use uma senha com pelo menos 6 caracteres.");
+      if (password !== confirmation) throw new Error("As senhas não coincidem.");
+      const { error } = await supabaseDb.auth.updateUser({ password });
+      if (error) throw error;
+      closeModal("loginModal");
+      navigateTo("/cardapio?tab=profile");
+      showToast("Senha atualizada com sucesso.");
       return;
     }
 
-    const { error } = await supabaseDb.auth.signInWithPassword({ email, password });
-    if (error) {
-      const signUp = await supabaseDb.auth.signUp({
+    if (customerAuthMode === "forgot") {
+      if (!email) throw new Error("Informe seu e-mail.");
+      const { error } = await supabaseDb.auth.resetPasswordForEmail(email, {
+        redirectTo: customerGoogleRedirectTo()
+      });
+      if (error) throw error;
+      closeModal("loginModal");
+      showToast("Enviamos o link de recuperação para seu e-mail.");
+      return;
+    }
+
+    if (customerAuthMode === "edit") {
+      if (!state.authUser) throw new Error("Sua sessão expirou. Entre novamente.");
+      state.customer = {
+        ...state.customer,
+        name: value("loginName"),
+        phone: value("loginPhone"),
+        address: value("loginAddress"),
+        addressNumber: value("loginAddressNumber"),
+        neighborhood: value("loginNeighborhood"),
+        complement: value("loginComplement"),
+        reference: value("loginReference")
+      };
+      if (!state.customer.name) throw new Error("Informe seu nome.");
+      await upsertCustomerProfile();
+      closeModal("loginModal");
+      renderAll();
+      showToast("Dados atualizados com segurança.");
+      if (customerAuthReturnToCheckout) {
+        customerAuthReturnToCheckout = false;
+        renderCheckout();
+        openModal("checkoutModal");
+      }
+      return;
+    }
+
+    if (!email || !password) throw new Error("Informe e-mail e senha.");
+
+    if (customerAuthMode === "signup") {
+      const fullName = value("loginName");
+      const phone = value("loginPhone");
+      if (!fullName || !phone) throw new Error("Informe nome e telefone.");
+      if (password.length < 6) throw new Error("Use uma senha com pelo menos 6 caracteres.");
+
+      const { data, error } = await supabaseDb.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            full_name: state.customer.name,
-            phone: state.customer.phone,
-            role: "customer"
-          }
+          data: { full_name: fullName, phone },
+          emailRedirectTo: customerGoogleRedirectTo()
         }
       });
+      if (error) throw error;
 
-      if (signUp.error) {
-        console.error(signUp.error);
-        showToast("Não foi possível entrar ou cadastrar");
+      if (data.session) {
+        state.authUser = data.session.user;
+        state.loggedIn = true;
+        state.customer = { ...emptyCustomer(), name: fullName, phone, email };
+        await loadProfile();
+        if (!state.profile) await ensureCustomerProfile();
+        closeModal("loginModal");
+        await refreshFromSupabase();
+        navigateTo("/cardapio?tab=profile");
+        showToast("Conta criada com sucesso.");
         return;
       }
 
-      if (!signUp.data.session) {
-        showToast("Cadastro criado. Confirme seu e-mail antes de finalizar.");
+      if (data.user) {
+        pendingConfirmationEmail = email;
+        clearCustomerAccountState();
+        closeModal("loginModal");
+        customerAuthReturnToCheckout = false;
+        navigateTo("/cardapio?tab=profile");
+        renderAll();
         return;
       }
 
-      state.authUser = signUp.data.user;
+      throw new Error("Não foi possível criar sua conta.");
+    }
+
+    const { data, error } = await supabaseDb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    state.authUser = data.user;
+    state.loggedIn = true;
+    await loadProfile();
+    if (!state.profile) await ensureCustomerProfile();
+    closeModal("loginModal");
+    await refreshFromSupabase();
+
+    if (customerAuthReturnToCheckout) {
+      customerAuthReturnToCheckout = false;
+      renderCheckout();
+      openModal("checkoutModal");
     } else {
-      const { data } = await supabaseDb.auth.getUser();
-      state.authUser = data.user;
+      navigateTo("/cardapio?tab=profile");
     }
-
-    try {
-      await upsertCustomerProfile();
-    } catch (profileError) {
-      console.error(profileError);
-      showToast("Não foi possível salvar perfil");
-      return;
-    }
+  } catch (error) {
+    console.error("Customer auth error:", error);
+    setCustomerAuthError(error.message || "Não foi possível concluir. Tente novamente.");
+  } finally {
+    setCustomerAuthLoading(false);
   }
-  state.loggedIn = true;
+}
+
+async function startCustomerGoogleLogin() {
+  if (!usingSupabase()) {
+    showToast("Login com Google exige Supabase configurado");
+    return;
+  }
+  setCustomerAuthError("");
+  setCustomerAuthLoading(true);
+  try {
+    const { error } = await supabaseDb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: customerGoogleRedirectTo() }
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.error("Customer Google login error:", error);
+    setCustomerAuthError("Não foi possível iniciar o login com Google.");
+    showToast("Não foi possível iniciar o login com Google.");
+    setCustomerAuthLoading(false);
+  }
+}
+
+async function logoutCustomer() {
+  if (!usingSupabase()) return;
+  const { error } = await supabaseDb.auth.signOut({ scope: "local" });
+  if (error) {
+    console.error(error);
+    showToast("Não foi possível sair da conta.");
+    return;
+  }
+  pendingConfirmationEmail = "";
+  customerAuthReturnToCheckout = false;
+  clearCustomerAccountState();
   saveLocalSession();
+  navigateTo("/cardapio?tab=profile");
   renderAll();
-  closeModal("loginModal");
-  renderCheckout();
-  openModal("checkoutModal");
+  showToast("Você saiu. Seu carrinho foi mantido.");
 }
 
 async function resetPasswordFor(emailInputId) {
@@ -1417,7 +1623,7 @@ async function resetPasswordFor(emailInputId) {
   }
 
   const { error } = await supabaseDb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
+    redirectTo: emailInputId === "loginEmail" ? customerGoogleRedirectTo() : googleRedirectTo()
   });
 
   if (error) {
@@ -1473,6 +1679,11 @@ async function createOrder() {
     return;
   }
   const deliveryMode = document.getElementById("checkoutDeliveryMode").value;
+  const checkoutAddress = document.getElementById("checkoutAddress").value.trim();
+  if (deliveryMode === "Entrega no endereço" && checkoutAddress.length < 3) {
+    showToast("Informe o endereço de entrega.");
+    return;
+  }
   const orderDeliveryFee = deliveryMode === "Retirada no local" ? 0 : deliveryFee;
   const order = {
     id: `#${state.nextOrderNumber}`,
@@ -1480,7 +1691,7 @@ async function createOrder() {
     status: "Novo",
     customer: state.customer.name,
     phone: state.customer.phone,
-    address: deliveryMode === "Retirada no local" ? "Retirada no local" : document.getElementById("checkoutAddress").value.trim(),
+    address: deliveryMode === "Retirada no local" ? "Retirada no local" : checkoutAddress,
     deliveryMode,
     items: state.cart.map(item => ({ ...item })),
     notes: document.getElementById("checkoutNotes").value.trim() || "-",
@@ -1713,6 +1924,8 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register(swUrl);
   }
 
+  // Remove qualquer perfil legado que versões antigas tenham deixado no navegador.
+  saveLocalSession();
   renderAll();
   applyRoute();
   consumeOAuthErrorFromUrl();
@@ -1861,32 +2074,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("newOrderBtn")?.addEventListener("click", simulateNewOrder);
   document.getElementById("loginConfirmBtn")?.addEventListener("click", confirmLogin);
-  document.getElementById("loginGoogleBtn")?.addEventListener("click", async () => {
-    if (!usingSupabase()) {
-      showToast("Login com Google exige Supabase configurado");
-      return;
-    }
-    const btn = document.getElementById("loginGoogleBtn");
-    if (btn) btn.disabled = true;
-    try {
-      const { error } = await supabaseDb.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: customerGoogleRedirectTo()
-        }
-      });
-      if (error) {
-        console.error(error);
-        showToast("Não foi possível iniciar login com Google.");
-      }
-    } catch (error) {
-      console.error(error);
-      showToast("Falha ao iniciar login com Google.");
-    } finally {
-      if (btn) btn.disabled = false;
-    }
+  document.getElementById("loginGoogleBtn")?.addEventListener("click", startCustomerGoogleLogin);
+  document.getElementById("loginResetPasswordBtn")?.addEventListener("click", () => setCustomerAuthMode("forgot"));
+  document.getElementById("loginModeSwitchBtn")?.addEventListener("click", () => {
+    setCustomerAuthMode(customerAuthMode === "signup" || customerAuthMode === "forgot" ? "login" : "signup");
   });
-  document.getElementById("loginResetPasswordBtn")?.addEventListener("click", () => resetPasswordFor("loginEmail"));
   const adminLoginBtn = document.getElementById("adminLoginBtn");
   if (adminLoginBtn) adminLoginBtn.addEventListener("click", adminLoginFlow);
   document.getElementById("adminResetPasswordBtn")?.addEventListener("click", () => resetPasswordFor("adminEmail"));
@@ -1932,8 +2124,32 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (target.id === "publicProfileEditBtn") {
-      if (state.loggedIn) openCustomerProfileEditModal();
+      if (state.authUser) openCustomerProfileEditModal();
       else openCustomerLoginModal();
+      return;
+    }
+    if (target.id === "customerGoogleProfileBtn") {
+      startCustomerGoogleLogin();
+      return;
+    }
+    if (target.id === "customerEmailLoginBtn" || target.id === "confirmationBackToLogin") {
+      pendingConfirmationEmail = "";
+      customerAuthReturnToCheckout = false;
+      openCustomerLoginModal("login");
+      return;
+    }
+    if (target.id === "customerCreateAccountBtn") {
+      customerAuthReturnToCheckout = false;
+      openCustomerLoginModal("signup");
+      return;
+    }
+    if (target.id === "customerForgotPasswordBtn") {
+      customerAuthReturnToCheckout = false;
+      openCustomerLoginModal("forgot");
+      return;
+    }
+    if (target.id === "customerLogoutBtn") {
+      logoutCustomer();
       return;
     }
 
@@ -1949,7 +2165,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (target.dataset.delete) deleteOrder(target.dataset.delete);
     if (target.dataset.print) printOrder(target.dataset.print);
     if (target.dataset.whatsapp) showToast("Mensagem do WhatsApp preparada");
-    if (target.id === "myOrdersLoginBtn") openCustomerLoginModal();
+    if (target.id === "myOrdersLoginBtn") {
+      customerAuthReturnToCheckout = false;
+      openCustomerLoginModal();
+    }
   });
 
   document.body.addEventListener("change", event => {
@@ -1970,7 +2189,12 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("daniel:state-change", renderAll);
   window.addEventListener("storage", event => {
     if (event.key !== "danielLanchesRealtime") return;
-    Object.assign(state, JSON.parse(event.newValue));
+    try {
+      const stored = JSON.parse(event.newValue || "{}");
+      if (Array.isArray(stored.cart)) state.cart = stored.cart;
+    } catch (error) {
+      console.error("Local state sync error:", error);
+    }
     renderAll();
   });
   window.addEventListener("resize", () => {

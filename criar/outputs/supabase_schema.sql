@@ -3,8 +3,15 @@
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  email text,
   full_name text not null default '',
   phone text not null default '',
+  avatar_url text,
+  address text not null default '',
+  address_number text not null default '',
+  neighborhood text not null default '',
+  complement text not null default '',
+  reference text not null default '',
   role text not null default 'customer'
     check (role in ('customer', 'employee', 'delivery', 'admin', 'super_admin')),
   created_at timestamptz not null default now(),
@@ -14,6 +21,11 @@ create table if not exists public.profiles (
 -- Login com Google (cliente): guarda e-mail e avatar vindos do OAuth.
 alter table public.profiles add column if not exists email text;
 alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists address text not null default '';
+alter table public.profiles add column if not exists address_number text not null default '';
+alter table public.profiles add column if not exists neighborhood text not null default '';
+alter table public.profiles add column if not exists complement text not null default '';
+alter table public.profiles add column if not exists reference text not null default '';
 
 create table if not exists public.store_settings (
   id text primary key default 'default',
@@ -137,6 +149,7 @@ end $$;
 
 create index if not exists profiles_role_idx on public.profiles (role);
 create index if not exists profiles_phone_idx on public.profiles (phone);
+create index if not exists profiles_email_idx on public.profiles (email);
 create index if not exists products_available_idx on public.products (available);
 create index if not exists orders_user_id_idx on public.orders (user_id);
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
@@ -150,6 +163,53 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+-- O perfil usa exatamente o UUID criado em auth.users. A captura de exceção é
+-- intencional: uma falha de dados no perfil nunca deve bloquear o cadastro Auth.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (
+    id,
+    email,
+    full_name,
+    phone,
+    avatar_url,
+    role
+  )
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', ''),
+    coalesce(new.raw_user_meta_data ->> 'phone', ''),
+    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture', ''),
+    'customer'
+  )
+  on conflict (id) do nothing;
+
+  return new;
+exception
+  when others then
+    raise warning 'Não foi possível criar profiles para auth.users %: %', new.id, sqlerrm;
+    return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
+-- Completa e-mails de perfis antigos sem alterar cargo ou dados pessoais.
+update public.profiles as profile
+set email = auth_user.email
+from auth.users as auth_user
+where profile.id = auth_user.id
+  and profile.email is null;
 
 create or replace function public.current_user_role()
 returns text

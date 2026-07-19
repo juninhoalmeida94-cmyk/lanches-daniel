@@ -54,7 +54,21 @@ window.__ENV__ = {
 
 No painel Supabase → Authentication:
 - habilite **Email/Password**
-- para desenvolvimento, desative confirmação obrigatória de e-mail
+- habilite **Confirm email** para validar o fluxo real de confirmação
+- habilite o provider **Google**
+- em **URL Configuration**, mantenha a URL publicada como Site URL
+- adicione as URLs do cardápio local e publicado na lista de Redirect URLs
+
+Exemplos usados pelo app:
+
+```text
+http://localhost:4173/index.html?tab=profile
+https://juninhoalmeida94-cmyk.github.io/lanches-daniel/cardapio?tab=profile
+https://juninhoalmeida94-cmyk.github.io/lanches-daniel/admin/login
+```
+
+O cadastro de cliente é livre. O acesso administrativo continua dependendo do
+campo `profiles.role` ser `employee`, `delivery`, `admin` ou `super_admin`.
 
 ### 4. Promover admin
 
@@ -113,7 +127,15 @@ Sempre que alterar `index.html`, `style.css`, `script.js` ou `public-app.js`, su
 
 ## Teste de ponta a ponta
 
-1. Abra o app como cliente → adicione itens → faça login → finalize pedido.
-2. Em outra aba, entre como admin → veja o pedido aparecer no kanban em tempo real.
-3. Avance o status → o cliente vê a atualização sem recarregar.
-4. Verifique no banco que o `stock` dos produtos foi decrementado.
+1. Cadastre um e-mail novo e confirme que `data.session` fica vazio enquanto a confirmação estiver pendente.
+2. Abra o link recebido e entre com o e-mail confirmado.
+3. Entre com Google e confirme o retorno para `?tab=profile`.
+4. Atualize a página e confira que a sessão e o perfil permanecem ativos.
+5. Edite telefone/endereço e confirme os dados em `public.profiles`.
+6. Saia da conta e confira a tela “Entre ou crie sua conta”; o carrinho deve permanecer.
+7. Repita com um segundo usuário e confirme que os perfis têm UUIDs e dados diferentes.
+8. Finalize um pedido em cada conta e confira `orders.user_id = auth.uid()`.
+9. Confirme que cada cliente vê somente os próprios pedidos.
+10. Confira os dois usuários em **Authentication → Users** e os UUIDs correspondentes em `public.profiles`.
+11. Em outra aba, entre como admin e confirme que os pedidos continuam visíveis no kanban em tempo real.
+12. Avance o status e confirme a atualização no cliente sem recarregar.

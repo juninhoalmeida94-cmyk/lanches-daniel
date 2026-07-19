@@ -133,14 +133,41 @@
             </section>
           ` : tab === "profile" ? `
             <section class="public-panel">
-              <div class="panel-head"><div><span class="eyebrow">Perfil</span><h2>Dados do cliente</h2></div></div>
-              <div class="profile-card">
+              <div class="panel-head"><div><span class="eyebrow">Sua conta</span><h2>Perfil</h2></div></div>
+
+              <div class="customer-auth-gate" id="customerAuthGate">
+                <div class="customer-auth-icon"><i data-lucide="user-round"></i></div>
+                <div><h2>Entre ou crie sua conta</h2><p>Acompanhe pedidos e mantenha seus dados de entrega protegidos.</p></div>
+                <button type="button" class="google-login-btn" id="customerGoogleProfileBtn">
+                  <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.5 24.5c0-1.57-.14-3.08-.4-4.54H24v9.09h12.64c-.55 2.94-2.2 5.43-4.7 7.1l7.27 5.64C43.47 37.86 46.5 31.67 46.5 24.5z"/>
+                    <path fill="#FBBC05" d="M10.54 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.28-3.13.79-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.98-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.47 0 11.9-2.13 15.87-5.81l-7.27-5.64c-2.02 1.36-4.6 2.15-8.6 2.15-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                  </svg>
+                  <span>Continuar com Google</span>
+                </button>
+                <button type="button" class="primary-btn full" id="customerEmailLoginBtn"><i data-lucide="mail"></i><span>Entrar com e-mail e senha</span></button>
+                <button type="button" class="secondary-btn full" id="customerCreateAccountBtn"><i data-lucide="user-round-plus"></i><span>Criar conta</span></button>
+                <button type="button" class="customer-auth-link" id="customerForgotPasswordBtn">Esqueci minha senha</button>
+              </div>
+
+              <div class="customer-confirmation" id="customerEmailConfirmation" style="display:none;">
+                <div class="customer-auth-icon"><i data-lucide="mail-check"></i></div>
+                <h2>Confirme seu e-mail</h2>
+                <p>Enviamos um link de confirmação para <strong id="customerConfirmationEmail"></strong>. Confirme o endereço e depois volte para entrar.</p>
+                <button type="button" class="primary-btn" id="confirmationBackToLogin"><i data-lucide="log-in"></i><span>Voltar para entrar</span></button>
+              </div>
+
+              <div class="profile-card" id="customerProfileContent" style="display:none;">
                 <img class="profile-avatar" id="customerProfileAvatar" alt="Foto do perfil" style="display:none;" />
-                <p>Nome: <strong id="customerProfileName">Cliente Daniel</strong></p>
+                <p>Nome: <strong id="customerProfileName"></strong></p>
                 <p>E-mail: <strong id="customerProfileEmail">-</strong></p>
-                <p>Telefone: <strong id="customerProfilePhone">(11) 90000-2026</strong></p>
-                <p>Endereço: <strong id="customerProfileAddress">Rua das Flores, 128</strong></p>
+                <p>Telefone: <strong id="customerProfilePhone">Não informado</strong></p>
+                <p>Endereço: <strong id="customerProfileAddress">Não informado</strong></p>
+                <p>Referência: <strong id="customerProfileReference">Não informado</strong></p>
                 <button class="primary-btn" id="publicProfileEditBtn"><i data-lucide="user-round-plus"></i><span>Atualizar dados</span></button>
+                <button class="secondary-btn" id="customerLogoutBtn"><i data-lucide="log-out"></i><span>Sair da conta</span></button>
               </div>
             </section>
           ` : `
